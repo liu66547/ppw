@@ -32,6 +32,11 @@ links:
   - label: Gitee
     href: https://gitee.com/liu66547/xzs-api-test
     icon: gitee
+screenshots:
+  - src: /projects/sample-allure-report.png
+    alt: Allure 测试报告总览，显示 35 条用例全部通过
+    caption: 这是样例图，用来演示截图图集的排版效果。请替换成你自己 Allure 报告的真实截图 —— 这张图的价值在于面试官能直接看到 35 条用例 0 失败。
+    group: 测试报告
 ---
 
 ## 项目背景

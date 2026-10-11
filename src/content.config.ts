@@ -61,6 +61,28 @@ const projects = defineCollection({
 
     /** 是否在首页展示 */
     featured: z.boolean().default(true),
+
+    /**
+     * 项目截图 —— 这是最有说服力的部分，强烈建议放。
+     *
+     * 图片放在 public/projects/ 目录下，src 写以 / 开头的绝对路径：
+     *   src: '/projects/allure-report.png'
+     *
+     * group 用来给截图分组，同一组的会显示成一个小标题下的连续图集。
+     * 建议分组：'测试报告' / '持续集成' / '缺陷证据' / '代码结构'
+     */
+    screenshots: z
+      .array(
+        z.object({
+          src: z.string(),
+          /** 图片说明（必填）—— 无人值守的截图对面试官没有价值 */
+          alt: z.string(),
+          /** 图注，显示在图片下方，可以写"这张图说明了什么" */
+          caption: z.string().optional(),
+          group: z.string().optional(),
+        }),
+      )
+      .default([]),
   }),
 });
 

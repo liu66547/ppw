@@ -5,6 +5,7 @@
  */
 import { getCollection, render } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import ScreenshotGallery from '../../components/ScreenshotGallery.astro';
 import { profile } from '../../data/profile';
 
 export async function getStaticPaths() {
@@ -131,6 +132,8 @@ const others = (await getCollection('projects'))
     <div class="grid gap-12 lg:grid-cols-[minmax(0,1fr)_15rem]">
       <article class="prose-tech min-w-0">
         <Content />
+
+        <ScreenshotGallery screenshots={d.screenshots} />
       </article>
 
       <aside class="hidden lg:block">
@@ -152,6 +155,18 @@ const others = (await getCollection('projects'))
                     </a>
                   </li>
                 ))
+              }
+              {
+                d.screenshots.length > 0 && (
+                  <li>
+                    <a
+                      href="#screenshots"
+                      class="-ml-px block border-l-2 border-transparent py-0.5 pl-3 text-[13px] leading-snug text-fog-500 transition-colors hover:border-accent-500 hover:text-accent-300"
+                    >
+                      项目截图
+                    </a>
+                  </li>
+                )
               }
             </ul>
           </nav>

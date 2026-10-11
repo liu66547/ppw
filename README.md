@@ -49,9 +49,20 @@ npm run check    # 类型检查
 ### 加一个新项目
 
 1. 在 `src/content/projects/` 下新建一个 `.md` 文件
-2. 文件名就是网址，例如 `my-new-project.md` → `/projects/my-new-project`
+2. 文件名就是网址，例如 `my-new-project.md` → `/projects/my-new-project/`
 3. 复制现有文件的开头部分（`---` 之间的 frontmatter），改成你的内容
 4. 保存 —— **首页会自动多出一张卡片，不用改任何代码**
+
+### 加项目截图（强烈建议）
+
+截图是网站上最有说服力的部分。操作步骤见 **`docs/03-项目截图操作指引.md`**，简要流程：
+
+1. 图片放进 `public/projects/`
+2. 在项目 `.md` 的 frontmatter 里加 `screenshots:` 段落
+3. 支持分组、图注、点击放大
+
+> ⚠️ 现在放着一张**样例截图**（`public/projects/sample-allure-report.png`），
+> 只是用来演示排版，**请替换成你自己的真实截图**。
 
 ### 改配色 / 字体 / 圆角
 
@@ -61,6 +72,19 @@ npm run check    # 类型检查
 
 把新的 PDF 放进 `public/` 目录，然后改 `src/data/profile.ts` 里的
 `contact.resumeFile` 指向新文件名（注意文件名要和实际文件完全一致）。
+
+---
+
+## 验收
+
+改完内容后跑一下验收脚本，确认没把链接、SEO 配置改坏：
+
+```bash
+python _tools/acceptance_check.py
+```
+
+检查 21 项：页面清单、内部链接、锚点、静态资源、HTML 结构、
+canonical 与 sitemap 一致性、无障碍兜底、外链安全。
 
 ---
 
@@ -98,3 +122,5 @@ public/                   静态资源（简历 PDF、图标）
 
 - `docs/00-方向确认书.md` —— 网站定位、栏目结构、技术选型理由
 - `docs/01-项目进度与环境说明.md` —— 进度、环境限制、部署清单、决策记录
+- `docs/02-部署上线操作手册.md` —— 部署上线全流程（零基础可执行）
+- `docs/03-项目截图操作指引.md` —— 该截哪些图、怎么截、怎么挂上去

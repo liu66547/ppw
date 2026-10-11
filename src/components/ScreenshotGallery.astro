@@ -1,0 +1,156 @@
+---
+/**
+ * 项目截图图集
+ *
+ * 设计考量：
+ * - 截图是「我说我做过」变成「你看这是我做的」的关键证据，所以给它足够的展示宽度
+ * - 每张图必须有图注 —— 无人值守的截图对面试官没有价值，要告诉他"这张图说明什么"
+ * - 点击放大：Allure 报告这类截图字很小，必须能放大看
+ * - 放大层用原生 <dialog>，浏览器自带 Esc 关闭和焦点管理，比手写弹层可靠
+ */
+interface Shot {
+  src: string;
+  alt: string;
+  caption?: string;
+  group?: string;
+}
+
+interface Props {
+  screenshots: Shot[];
+}
+
+const { screenshots } = Astro.props;
+
+// 按 group 分组，保留原始顺序
+const groups: { name: string | undefined; items: (Shot & { index: number })[] }[] = [];
+let counter = 0;
+for (const s of screenshots) {
+  const last = groups[groups.length - 1];
+  if (last && last.name === s.group) {
+    last.items.push({ ...s, index: counter++ });
+  } else {
+    groups.push({ name: s.group, items: [{ ...s, index: counter++ }] });
+  }
+}
+---
+
+{
+  screenshots.length > 0 && (
+    <section class="mt-14 border-t border-ink-700 pt-10" id="screenshots">
+      <div class="flex items-baseline justify-between gap-4">
+        <h2 class="text-xl font-bold tracking-tight text-fog-50 md:text-2xl">项目截图</h2>
+        <span class="mono text-[11px] text-fog-500">{screenshots.length} 张 · 点击放大</span>
+      </div>
+
+      {groups.map((g) => (
+        <div class="mt-8">
+          {g.name && (
+            <h3 class="mono mb-4 text-xs uppercase tracking-widest text-accent-400">{g.name}</h3>
+          )}
+
+          <div class="space-y-7">
+            {g.items.map((shot) => (
+              <figure class="group">
+                <button
+                  type="button"
+                  class="block w-full cursor-zoom-in overflow-hidden rounded-xl border border-ink-700 bg-ink-900 p-1 transition-colors hover:border-accent-500/60"
+                  data-lightbox={String(shot.index)}
+                  aria-label={`放大查看：${shot.alt}`}
+                >
+                  <img
+                    src={shot.src}
+                    alt={shot.alt}
+                    loading="lazy"
+                    decoding="async"
+                    class="w-full rounded-lg"
+                  />
+                </button>
+                {shot.caption && (
+                  <figcaption class="mt-3 flex items-start gap-2 text-[13px] leading-relaxed text-fog-400">
+                    <span class="mt-2 size-1 shrink-0 rounded-full bg-accent-500" aria-hidden="true" />
+                    <span>{shot.caption}</span>
+                  </figcaption>
+                )}
+              </figure>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {/* 放大层 */}
+      <dialog
+        id="lightbox"
+        class="m-0 max-h-none max-w-none bg-transparent p-0 backdrop:bg-ink-950/92 backdrop:backdrop-blur-sm"
+      >
+        <div class="grid min-h-screen place-items-center p-4 md:p-8">
+          <div class="relative w-full max-w-6xl">
+            <button
+              type="button"
+              id="lightbox-close"
+              class="absolute -top-11 right-0 flex items-center gap-1.5 rounded-lg border border-ink-600 bg-ink-850 px-3 py-1.5 text-xs text-fog-200 transition-colors hover:border-accent-500 hover:text-accent-300"
+              aria-label="关闭"
+            >
+              <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+              关闭 (Esc)
+            </button>
+
+            <img id="lightbox-img" src="" alt="" class="w-full rounded-xl border border-ink-700" />
+            <p id="lightbox-caption" class="mt-4 text-center text-sm text-fog-400"></p>
+          </div>
+        </div>
+      </dialog>
+    </section>
+  )
+}
+
+<script>
+  const dialog = document.getElementById('lightbox') as HTMLDialogElement | null;
+  const img = document.getElementById('lightbox-img') as HTMLImageElement | null;
+  const caption = document.getElementById('lightbox-caption');
+  const closeBtn = document.getElementById('lightbox-close');
+
+  if (dialog && img && caption) {
+    const shots: { src: string; alt: string; caption?: string }[] = [];
+
+    // 收集当前页所有截图信息
+    document.querySelectorAll<HTMLButtonElement>('button[data-lightbox]').forEach((btn) => {
+      const figure = btn.closest('figure');
+      const image = btn.querySelector('img');
+      if (!image) return;
+      shots.push({
+        src: image.getAttribute('src') || '',
+        alt: image.getAttribute('alt') || '',
+        caption: figure?.querySelector('figcaption')?.textContent?.trim() || '',
+      });
+    });
+
+    const open = (index: number) => {
+      const shot = shots[index];
+      if (!shot) return;
+      img.src = shot.src;
+      img.alt = shot.alt;
+      caption.textContent = shot.caption || '';
+      dialog.showModal();
+    };
+
+    document.querySelectorAll<HTMLButtonElement>('button[data-lightbox]').forEach((btn) => {
+      btn.addEventListener('click', () => open(Number(btn.dataset.lightbox)));
+    });
+
+    closeBtn?.addEventListener('click', () => dialog.close());
+
+    // 点击背景关闭（dialog 自身区域之外）
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) dialog.close();
+    });
+
+    // 关闭时清空 src，避免下次打开闪一下旧图
+    dialog.addEventListener('close', () => {
+      img.src = '';
+      caption.textContent = '';
+    });
+  }
+</script>
