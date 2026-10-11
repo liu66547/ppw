@@ -1,11 +1,18 @@
 ---
 /**
- * 技能板块 —— 按熟练度分档，每项带"证据"说明在哪用过
- * 只列"我会什么"而说不出"在哪用过"的技能，面试一追问就露馅，所以每项都写了 evidence。
+ * 专业技能 —— 三段式卡片
+ *
+ * 结构（参考站的做法，信息层级更清楚）：
+ *   ① 图标 + 分组名          视觉锚点，一眼区分领域
+ *   ② summary 一句话          这个领域我能做到什么
+ *   ③ items 技能明细          具体能力 + 在哪用过（evidence）
+ *   ④ tags 底部能力标签行      扫一眼抓住关键词
+ *
+ * 视觉权重：核心能力（core）用强调边框 + 更大内边距；其余弱化。
+ * 只用图标的颜色和边框区分，不做填充色块 —— 深色下大面积色块会显得廉价。
  */
 import { skillGroups, levelLabel } from '../data/skills';
 
-// 核心技能（主打能力）排前面，且用更醒目的样式
 const core = skillGroups.filter((g) => g.core);
 const rest = skillGroups.filter((g) => !g.core);
 
@@ -13,6 +20,34 @@ const levelClass: Record<string, string> = {
   skill: 'border-accent-500/45 bg-accent-500/12 text-accent-300',
   familiar: 'border-azure-500/40 bg-azure-500/10 text-azure-300',
   know: 'border-ink-600 bg-ink-800 text-fog-400',
+};
+
+// 每个分组一个图标，用 24x24 的填充路径
+const icons: Record<string, string> = {
+  // 接口：节点连线
+  api:
+    'M12 2a3 3 0 0 1 3 3c0 1.3-.8 2.4-2 2.8V10h4a2 2 0 0 1 2 2v1.2a3 3 0 1 1-2 0V12H7v1.2a3 3 0 1 1-2 0V12a2 2 0 0 1 2-2h4V7.8A3 3 0 0 1 12 2Zm-6 14a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm12 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2ZM12 4a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z',
+  // UI：光标 + 窗口
+  ui:
+    'M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-6.6l2.3 2.3a1 1 0 0 1-1.4 1.4L12 18.4l-2.3 2.3a1 1 0 1 1-1.4-1.4L10.6 17H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm1 2v9h14V6H5Z',
+  // 工程化：流水线齿轮
+  engineering:
+    'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm0 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm-1.2-8h2.4l.4 2.4 1.6.66 2-1.4 1.7 1.7-1.4 2 .66 1.6L21 9.2v2.4l-2.4.4-.66 1.6 1.4 2-1.7 1.7-2-1.4-1.6.66L13.2 21h-2.4l-.4-2.4-1.6-.66-2 1.4-1.7-1.7 1.4-2-.66-1.6L3 13.2v-2.4l2.4-.4.66-1.6-1.4-2 1.7-1.7 2 1.4 1.6-.66L10.8 2Z',
+  // 测试设计：清单 + 勾
+  'test-design':
+    'M9 2h6a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm0 2v16h6V4H9Zm1.2 11.3 3.5-3.5-1.4-1.4-2.1 2.1-1.1-1.1-1.4 1.4 2.5 2.5Z',
+  // 数据库：柱体
+  database:
+    'M12 2c4.4 0 8 1.3 8 3v14c0 1.7-3.6 3-8 3s-8-1.3-8-3V5c0-1.7 3.6-3 8-3Zm0 2c-3.6 0-6 .8-6 1s2.4 1 6 1 6-.8 6-1-2.4-1-6-1Zm6 4.6c-1.4.8-3.6 1.2-6 1.2s-4.6-.4-6-1.2V11c0 .2 2.4 1 6 1s6-.8 6-1V8.6Zm0 6c-1.4.8-3.6 1.2-6 1.2s-4.6-.4-6-1.2V17c0 .2 2.4 1 6 1s6-.8 6-1v-2.4Z',
+  // 语言：代码尖括号
+  language:
+    'M9.4 4.6 3 11l6.4 6.4 1.4-1.4L5.8 11l5-5-1.4-1.4Zm5.2 0L13.2 6l5 5-5 5 1.4 1.4L21 11l-6.4-6.4Z',
+  // 工具：扳手
+  tools:
+    'm14.7 2.3 3 3a1 1 0 0 1 0 1.4l-1.6 1.6 2.3 2.3a5 5 0 0 1-6.4 6.4l-6.5 6.5a1 1 0 0 1-1.4-1.4l6.5-6.5a5 5 0 0 1 6.4-6.4l-2.3-2.3-1.6 1.6a1 1 0 0 1-1.4 0l-3-3a1 1 0 0 1 0-1.4l2.6-2.6a1 1 0 0 1 1.4 0l2 2 2-2a1 1 0 0 1 1.4 0Z',
+  // 后端：服务器
+  backend:
+    'M4 3h16a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm1 7h14V5H5v5Zm-1 4h16a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1Zm1 7h14v-5H5v5Zm2-10.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Zm0 8a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z',
 };
 ---
 
@@ -29,36 +64,58 @@ const levelClass: Record<string, string> = {
       </p>
     </div>
 
-    <!-- 核心能力：两列大卡片
-         卡片用 flex 纵向布局并让列表撑开剩余空间 ——
-         两列内容长度不同时，短的那张不会在底部留一块空白。 -->
+    <!-- 核心能力：两列，强调边框 -->
     <div class="mt-10 grid gap-5 lg:grid-cols-2">
       {
         core.map((group) => (
-          <div class="card reveal flex flex-col p-6">
-            <div class="flex items-center gap-2.5">
-              <span class="size-1.5 rounded-full bg-accent-400" aria-hidden="true" />
-              <h3 class="text-base font-semibold text-fog-50">{group.name}</h3>
+          <div class="card reveal relative flex flex-col overflow-hidden p-6">
+            {/* 顶部一条强调线，区分核心与非核心 */}
+            <span
+              class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-accent-500/70 via-accent-500/25 to-transparent"
+              aria-hidden="true"
+            />
+
+            <div class="flex items-start gap-3.5">
+              <span
+                class="grid size-11 shrink-0 place-items-center rounded-xl border border-accent-500/30 bg-accent-500/10"
+                aria-hidden="true"
+              >
+                <svg class="size-5.5 text-accent-300" viewBox="0 0 24 24" fill="currentColor">
+                  <path d={icons[group.id]} />
+                </svg>
+              </span>
+
+              <div class="min-w-0 flex-1">
+                <h3 class="text-[15px] font-semibold text-fog-50">{group.name}</h3>
+                <p class="mt-1 text-[13px] leading-relaxed text-accent-300/90">
+                  {group.summary}
+                </p>
+              </div>
             </div>
 
-            <ul class="mt-5 flex flex-1 flex-col justify-between gap-5">
+            <ul class="mt-5 flex flex-1 flex-col justify-between gap-4">
               {group.items.map((item) => (
-                <li>
+                <li class="border-t border-ink-700/70 pt-4">
                   <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-                    <span class="text-sm font-medium text-fog-50">{item.name}</span>
+                    <span class="text-[13px] font-medium text-fog-100">{item.name}</span>
                     <span
                       class:list={[
-                        'rounded border px-1.5 py-0.5 text-[11px] font-medium',
+                        'rounded border px-1.5 py-0.5 text-[10px] font-medium',
                         levelClass[item.level],
                       ]}
                     >
                       {levelLabel[item.level]}
                     </span>
                   </div>
-                  <p class="mt-1.5 text-[13px] leading-relaxed text-fog-500">
-                    {item.evidence}
-                  </p>
+                  <p class="mt-1.5 text-xs leading-relaxed text-fog-500">{item.evidence}</p>
                 </li>
+              ))}
+            </ul>
+
+            {/* 底部能力标签行：扫一眼抓住关键词 */}
+            <ul class="mt-5 flex flex-wrap gap-1.5 border-t border-ink-700/70 pt-4">
+              {group.tags.map((t) => (
+                <li class="chip !text-[11px]">{t}</li>
               ))}
             </ul>
           </div>
@@ -66,13 +123,27 @@ const levelClass: Record<string, string> = {
       }
     </div>
 
-    <!-- 其他技能：三列紧凑卡片，同样用 flex 撑开 -->
-    <div class="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+    <!-- 其他技能：两列（共 5 组，4 + 1 的分布比 3 + 2 更平衡），弱化处理 -->
+    <div class="mt-5 grid gap-5 sm:grid-cols-2">
       {
         rest.map((group) => (
           <div class="card reveal flex flex-col p-5">
-            <h3 class="text-sm font-semibold text-fog-50">{group.name}</h3>
-            <ul class="mt-4 flex flex-1 flex-col justify-between gap-3.5">
+            <div class="flex items-start gap-3">
+              <span
+                class="grid size-9 shrink-0 place-items-center rounded-lg border border-ink-600 bg-ink-850"
+                aria-hidden="true"
+              >
+                <svg class="size-4.5 text-fog-500" viewBox="0 0 24 24" fill="currentColor">
+                  <path d={icons[group.id]} />
+                </svg>
+              </span>
+              <div class="min-w-0 flex-1">
+                <h3 class="text-sm font-semibold text-fog-50">{group.name}</h3>
+                <p class="mt-0.5 text-[11px] leading-relaxed text-fog-500">{group.summary}</p>
+              </div>
+            </div>
+
+            <ul class="mt-4 flex flex-1 flex-col justify-between gap-3">
               {group.items.map((item) => (
                 <li>
                   <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -88,6 +159,12 @@ const levelClass: Record<string, string> = {
                   </div>
                   <p class="mt-1 text-xs leading-relaxed text-fog-500">{item.evidence}</p>
                 </li>
+              ))}
+            </ul>
+
+            <ul class="mt-4 flex flex-wrap gap-1.5 border-t border-ink-700/70 pt-3.5">
+              {group.tags.map((t) => (
+                <li class="chip !py-0.5 !text-[10px]">{t}</li>
               ))}
             </ul>
           </div>

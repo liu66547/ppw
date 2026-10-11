@@ -1,9 +1,17 @@
 /**
- * 专业技能 —— 按分组展示。
+ * 专业技能与测试方法论
  *
+ * ─────────────────────────────────────────────────────────────
  * ⚠️ 措辞纪律（很重要，别乱改）：
  *   level 只能是 'skill' | 'familiar' | 'know' 三档，对应简历口径的「熟练 / 熟悉 / 了解」。
- *   网站上写的比简历夸张，面试官一对比就减分。宁可写得保守，被追问时答得上来。
+ *   网站上写得比简历夸张，面试官一对比就减分。宁可保守，被追问时答得上来。
+ * ─────────────────────────────────────────────────────────────
+ *
+ * 卡片是「三段式」结构，和参考站的做法一致：
+ *   ① 图标 + 分组名      —— 视觉锚点，一眼区分是哪个领域
+ *   ② summary 一句话      —— 这个领域我能做到什么
+ *   ③ items 技能明细      —— 具体能力 + 在哪用过（evidence）
+ *   ④ tags 底部能力标签行 —— 扫一眼就抓住的关键词
  */
 
 export type SkillLevel = 'skill' | 'familiar' | 'know';
@@ -14,19 +22,13 @@ export const levelLabel: Record<SkillLevel, string> = {
   know: '了解',
 };
 
-/** 熟练度对应的进度条宽度（纯视觉，别用来表达"我 80 分"这种不严谨的东西） */
-export const levelWeight: Record<SkillLevel, number> = {
-  skill: 3,
-  familiar: 2,
-  know: 1,
-};
-
 export const skillGroups = [
   {
     id: 'api',
     name: '接口自动化测试',
-    icon: 'network',
-    core: true, // core = 这是我的主打能力，首页会优先展示
+    core: true, // core = 主打能力，卡片用强调边框
+    summary: '能独立设计并搭建可维护的接口自动化框架，而不是写一堆脚本',
+    tags: ['RestAssured', 'TestNG', 'Hamcrest', 'HTTP', '会话管理', '断言体系'],
     items: [
       {
         name: 'RestAssured + TestNG + Hamcrest',
@@ -48,8 +50,9 @@ export const skillGroups = [
   {
     id: 'ui',
     name: 'UI 自动化测试',
-    icon: 'cursor',
     core: true,
+    summary: '让 UI 用例在页面改版后不用重写，而不是靠加 sleep 硬扛',
+    tags: ['Selenium', 'Page Object', 'XPath / CSS', '显式等待', '失败截图'],
     items: [
       {
         name: 'Selenium WebDriver',
@@ -71,8 +74,9 @@ export const skillGroups = [
   {
     id: 'engineering',
     name: '测试工程化',
-    icon: 'git-branch',
     core: true,
+    summary: '能独立把测试接进 CI，让结果自动产出、失败自动告警',
+    tags: ['Maven', 'Git', 'Jenkins', 'Allure', 'Linux', 'CI/CD'],
     items: [
       {
         name: 'Maven / Git',
@@ -99,8 +103,9 @@ export const skillGroups = [
   {
     id: 'test-design',
     name: '测试设计与流程',
-    icon: 'clipboard-check',
     core: true,
+    summary: '能判断"测到位了没有"，而不是只报告"跑通了"',
+    tags: ['等价类', '边界值', '场景法', '接口分层设计', '缺陷跟踪', '缺陷定位'],
     items: [
       {
         name: '用例设计方法',
@@ -122,8 +127,9 @@ export const skillGroups = [
   {
     id: 'database',
     name: '数据库与缓存',
-    icon: 'database',
     core: false,
+    summary: '能自己写查询验证数据，并用执行计划看性能',
+    tags: ['MySQL', 'SQL', 'EXPLAIN', '事务', '索引', 'Redis'],
     items: [
       {
         name: 'MySQL（Navicat）',
@@ -145,8 +151,9 @@ export const skillGroups = [
   {
     id: 'language',
     name: '编程语言',
-    icon: 'code',
     core: false,
+    summary: 'Java 为主力，能独立开发测试框架与工具类',
+    tags: ['Java', '面向对象', '多线程', 'ThreadLocal', 'Python'],
     items: [
       {
         name: 'Java',
@@ -168,8 +175,9 @@ export const skillGroups = [
   {
     id: 'tools',
     name: '测试工具',
-    icon: 'wrench',
     core: false,
+    summary: '接口调试、抓包分析与性能测试的日常工具',
+    tags: ['Postman', 'Fiddler', 'JMeter', '禅道'],
     items: [
       {
         name: 'Postman',
@@ -191,8 +199,9 @@ export const skillGroups = [
   {
     id: 'backend',
     name: '后端与网络',
-    icon: 'server',
     core: false,
+    summary: '能读后端源码辅助定位缺陷，理解请求在链路上怎么走',
+    tags: ['Spring Boot', 'MyBatis', 'IoC / AOP', 'TCP/IP', 'AI 工具'],
     items: [
       {
         name: 'Spring / Spring Boot / MyBatis',
@@ -214,8 +223,11 @@ export const skillGroups = [
 ] as const;
 
 /**
- * 测试方法论 —— 这是你区别于其他候选人的核心资产，首页单独一个板块展示。
- * 这些不是空话，每一条都对应你 README 里的真实实践。
+ * 测试方法论 —— 六条核心实践
+ *
+ * 这是区别于其他候选人的核心资产，所以每一条都对应项目里的真实实践，
+ * 不是空话。这些内容原本在首页有一个独立板块，现在收进项目详情页的
+ * 「测试设计原则」一节（那里有完整的上下文）。留在这里供后续复用。
  */
 export const principles = [
   {
