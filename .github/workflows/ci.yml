@@ -1,0 +1,48 @@
+name: 构建与验收
+
+# 每次推送到 main、或提 PR 时自动跑：
+# 1. 类型检查（astro check）
+# 2. 构建（astro build）
+# 3. 交付前验收（链接、资源、SEO、无障碍一致性）
+#
+# 这样改坏了配置会立刻在 GitHub 上标红，不会等到部署后才发现。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-verify:
+    name: 构建 + 验收
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 类型检查
+        run: npm run check
+
+      - name: 构建
+        run: npm run build
+        env:
+          ASTRO_TELEMETRY_DISABLED: '1'
+
+      - name: 安装 Python（验收脚本需要）
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 交付前验收
+        run: python _tools/acceptance_check.py

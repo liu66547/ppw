@@ -31,8 +31,12 @@ Thumbs.db
 !.vscode/extensions.json
 .idea/
 
-# 简历 PDF 提取用的临时工具（私人用途，不进仓库）
-_tools/
+# 开发辅助脚本目录：忽略里面的内容（含一个从简历 PDF 提取文字的私人脚本）
+# 注意必须写成 _tools/* 而不是 _tools/ —— 目录整体被忽略时 Git 不会遍历进去，
+# 后面的 ! 放行规则就不会生效。
+# 放行验收脚本是因为 GitHub Actions 的 CI 需要它。
+_tools/*
+!_tools/acceptance_check.py
 
 # 本地截图验证产物
 _shots/

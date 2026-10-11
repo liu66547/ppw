@@ -5,6 +5,11 @@
 
 **技术栈**：Astro 5 + TypeScript + Tailwind CSS 4 → 输出纯静态站点
 
+> 💡 下面这个徽章要等你推到 GitHub 后才显示。记得把 URL 里的
+> `你的用户名` 换成你自己的 GitHub 用户名。
+
+[![构建与验收](https://github.com/你的用户名/portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/你的用户名/portfolio/actions/workflows/ci.yml)
+
 ---
 
 ## 快速开始
