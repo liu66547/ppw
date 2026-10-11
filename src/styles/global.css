@@ -793,13 +793,22 @@ body {
 .prose-tech tbody tr:hover {
   background-color: color-mix(in srgb, var(--color-accent-500) 7%, transparent);
 }
-/* 表格里的加粗单元格（如"合计"行）单独提亮 */
-.prose-tech tbody tr:last-child {
-  background-color: color-mix(in srgb, var(--color-ink-850) 70%, transparent);
+
+/**
+ * 合计行提亮 —— 只作用于「首列是加粗文字」的行。
+ *
+ * 为什么不用 tr:last-child：
+ *   那会把每张表的最后一行都当成合计行。技术栈那张表的最后一行是
+ *   「版本管理 / Git」，被高亮后看起来像重点，实际只是个普通数据行。
+ *   用 :has(strong:first-child) 精确匹配 markdown 里写成 | **合计** | 的行。
+ */
+.prose-tech tbody tr:has(> td:first-child > strong) {
+  background-color: color-mix(in srgb, var(--color-ink-850) 75%, transparent);
 }
-.prose-tech tbody tr:last-child td {
+.prose-tech tbody tr:has(> td:first-child > strong) td {
   font-weight: 600;
   color: var(--color-fog-50);
+  border-top: 1px solid var(--color-ink-700);
 }
 
 .prose-tech hr {
