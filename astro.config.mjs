@@ -8,6 +8,16 @@ export const SITE_URL = 'https://liudelin.vercel.app';
 export default defineConfig({
   site: SITE_URL,
 
+  /**
+   * 网址统一带结尾斜杠（/projects/xxx/）。
+   *
+   * 为什么：Astro 默认输出 dist/projects/xxx/index.html，对应的干净网址是
+   * /projects/xxx/。vercel.json 里配了 trailingSlash: "always" 与之对齐，
+   * 这样 canonical、sitemap.xml、实际访问地址三者完全一致。
+   * 三者不一致会让搜索引擎把同一个页面当成多个地址，分散权重。
+   */
+  trailingSlash: 'always',
+
   vite: {
     plugins: [tailwindcss()],
 

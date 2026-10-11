@@ -2,22 +2,24 @@
  * 站点地图：构建时自动生成 /sitemap.xml
  * 手写而不用 @astrojs/sitemap 集成，是为了少一个依赖。
  * 加了新页面（比如以后加博客）记得在这里补上路径。
+ *
+ * ⚠️ 地址必须带结尾斜杠 —— 要和 astro.config.mjs 的 trailingSlash: 'always'
+ *    以及 BaseLayout 里生成的 canonical 保持一致，否则搜索引擎会重复收录。
  */
 import type { APIRoute } from 'astro';
 import { getCollection } from 'astro:content';
 import { site } from '../data/profile';
 
 export const GET: APIRoute = async ({ site: astroSite }) => {
-  const base = (astroSite ?? new URL(site.url)).href.replace(/\/$/, '');
+  const base = (astroSite ?? new URL(site.url)).href.replace(/\/+$/, '');
 
   const projects = await getCollection('projects');
 
   const urls = [
-    { loc: `${base}/`, priority: '1.0', changefreq: 'monthly' },
+    { loc: `${base}/`, priority: '1.0' },
     ...projects.map((p) => ({
-      loc: `${base}/projects/${p.id}`,
+      loc: `${base}/projects/${p.id}/`,
       priority: p.data.featured ? '0.8' : '0.5',
-      changefreq: 'monthly' as const,
     })),
   ];
 
@@ -27,7 +29,7 @@ ${urls
   .map(
     (u) => `  <url>
     <loc>${u.loc}</loc>
-    <changefreq>${u.changefreq}</changefreq>
+    <changefreq>monthly</changefreq>
     <priority>${u.priority}</priority>
   </url>`,
   )

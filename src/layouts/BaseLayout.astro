@@ -10,9 +10,11 @@ import { site } from '../data/profile';
 interface Props {
   title?: string;
   description?: string;
+  /** 设置后该页不参与搜索引擎收录（用于 404 这类功能性页面） */
+  noindex?: boolean;
 }
 
-const { title, description = site.description } = Astro.props;
+const { title, description = site.description, noindex = false } = Astro.props;
 const pageTitle = title ? `${title} · ${site.titleSuffix}` : site.titleSuffix;
 const canonical = new URL(Astro.url.pathname, Astro.site ?? site.url).href;
 ---
@@ -27,7 +29,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? site.url).href;
 
     <title>{pageTitle}</title>
     <meta name="description" content={description} />
-    <link rel="canonical" href={canonical} />
+    {noindex ? <meta name="robots" content="noindex, follow" /> : <link rel="canonical" href={canonical} />}
 
     <!-- 社交分享卡片 -->
     <meta property="og:type" content="website" />
