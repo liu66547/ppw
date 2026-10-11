@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://liudelin.vercel.app/sitemap.xml
+Sitemap: https://len666.top/sitemap.xml

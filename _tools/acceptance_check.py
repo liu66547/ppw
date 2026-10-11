@@ -282,6 +282,60 @@ else:
     ok('所有 target=_blank 外链都带 rel=noopener')
 
 
+# ── 9. Frontmatter 静默截断检测 ──────────────────────────────
+print('\n=== 9. Frontmatter YAML 安全性 ===')
+# YAML 里 `#`（前面有空格）是行内注释符，后面的内容会被静默丢弃且不报错。
+# 这个坑踩过一次：图注被从中间截断，页面上看不出来是"少了一半"还是"本来就短"。
+PROJ_DIR = os.path.join(os.path.dirname(ROOT), 'src', 'content', 'projects')
+risky = []
+if os.path.isdir(PROJ_DIR):
+    for fn in sorted(os.listdir(PROJ_DIR)):
+        if not fn.endswith(('.md', '.mdx')):
+            continue
+        path = os.path.join(PROJ_DIR, fn)
+        with open(path, encoding='utf-8') as f:
+            lines = f.read().splitlines()
+        # 只检查最前面的 frontmatter 区块
+        try:
+            end = lines.index('---', 1)
+        except ValueError:
+            end = len(lines)
+        for i, line in enumerate(lines[1:end], 2):
+            s = line.strip()
+            if not s or s.startswith('#'):
+                continue
+            m = re.match(r'^(?:- )?[\w]+:\s*(.+)$', s)
+            if not m:
+                continue
+            val = m.group(1).strip()
+            if val.startswith(("'", '"')):
+                continue  # 已加引号，安全
+            if ' #' in val or '\t#' in val:
+                risky.append('%s 第 %d 行：值里有未加引号的 "#"，后面内容会被当注释丢弃 → %s'
+                             % (fn, i, s[:70]))
+
+if risky:
+    for r in risky:
+        fail(r)
+    print('      修法：把整个值用单引号包起来，例如 caption: \'文字 #内容 文字\'')
+else:
+    ok('frontmatter 中没有会被 YAML 当注释截断的未加引号 "#"')
+
+# 额外检查：captions 长度是否与源文件一致（防止其他静默丢失）
+with open(os.path.join(ROOT, 'projects', 'xzs-api-test', 'index.html'), encoding='utf-8') as f:
+    html = f.read()
+caps_in_html = re.findall(r'<figcaption[^>]*>(.*?)</figcaption>', html, re.S)
+caps_in_html = [re.sub(r'<[^>]+>', '', c).strip() for c in caps_in_html]
+if caps_in_html:
+    ok('详情页渲染出 %d 条图注，最短 %d 字、最长 %d 字'
+       % (len(caps_in_html), min(len(c) for c in caps_in_html), max(len(c) for c in caps_in_html)))
+    too_short = [c for c in caps_in_html if len(c) < 15]
+    if too_short:
+        fail('有图注过短，可能被截断：%s' % too_short)
+    else:
+        ok('所有图注长度正常，没有被截断的迹象')
+
+
 # ── 汇总 ─────────────────────────────────────────────────────
 print('\n' + '=' * 60)
 print('验收结果：%d 项通过 / %d 项警告 / %d 项失败' % (len(oks), len(warns), len(fails)))

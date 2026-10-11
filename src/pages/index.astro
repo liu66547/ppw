@@ -1,11 +1,23 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Hero from '../components/Hero.astro';
-import StatsBar from '../components/StatsBar.astro';
+import TechStack from '../components/TechStack.astro';
 import Skills from '../components/Skills.astro';
+import Advantages from '../components/Advantages.astro';
 import Projects from '../components/Projects.astro';
-import Principles from '../components/Principles.astro';
 import { profile } from '../data/profile';
+
+/**
+ * 首页板块顺序（按重要性和阅读节奏排）：
+ *   1. Hero        —— 我是谁、在哪、怎么联系我
+ *   2. TechStack   —— 我的工具面有多宽（一眼扫完）
+ *   3. Skills      —— 我的专业能力，每项都带"在哪用过"
+ *   4. Advantages  —— 我为什么值得细看（四条有证据的优势）
+ *   5. Projects    —— 项目经历 + 实测数据 + 跳转链接
+ *
+ * 注意：项目的实测数据（21 接口 / 35 用例…）放在 Projects 板块内部，
+ * 不放首屏 —— 数据属于项目，抢首屏位置会显得喧宾夺主。
+ */
 
 // 结构化数据：帮助搜索引擎正确理解这是"一个人"，而不是一个公司网站
 const personJsonLd = {
@@ -17,6 +29,12 @@ const personJsonLd = {
   email: `mailto:${profile.contact.email}`,
   url: Astro.site?.href,
   sameAs: [profile.contact.github, profile.contact.gitee],
+  address: {
+    '@type': 'PostalAddress',
+    addressLocality: profile.location.city,
+    addressRegion: profile.location.district,
+    addressCountry: 'CN',
+  },
   alumniOf: {
     '@type': 'CollegeOrUniversity',
     name: profile.education.school,
@@ -37,9 +55,8 @@ const personJsonLd = {
   <script type="application/ld+json" set:html={JSON.stringify(personJsonLd)} />
 
   <Hero />
-  <StatsBar />
-
+  <TechStack />
   <Skills />
+  <Advantages />
   <Projects />
-  <Principles />
 </BaseLayout>

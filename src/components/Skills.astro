@@ -25,21 +25,23 @@ const levelClass: Record<string, string> = {
         每项技能都标注了我用它在哪个项目里做过什么 —— 这比列一串关键词有用。
         熟练度分三档：<span class="text-accent-300">熟练</span> ·
         <span class="text-azure-300">熟悉</span> ·
-        <span class="text-fog-400">了解</span>，口径与简历一致，不夸大。
+        <span class="text-fog-400">了解</span>，口径保守，不夸大。
       </p>
     </div>
 
-    <!-- 核心能力：两列大卡片 -->
+    <!-- 核心能力：两列大卡片
+         卡片用 flex 纵向布局并让列表撑开剩余空间 ——
+         两列内容长度不同时，短的那张不会在底部留一块空白。 -->
     <div class="mt-10 grid gap-5 lg:grid-cols-2">
       {
         core.map((group) => (
-          <div class="card reveal p-6">
+          <div class="card reveal flex flex-col p-6">
             <div class="flex items-center gap-2.5">
               <span class="size-1.5 rounded-full bg-accent-400" aria-hidden="true" />
               <h3 class="text-base font-semibold text-fog-50">{group.name}</h3>
             </div>
 
-            <ul class="mt-5 space-y-5">
+            <ul class="mt-5 flex flex-1 flex-col justify-between gap-5">
               {group.items.map((item) => (
                 <li>
                   <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
@@ -64,13 +66,13 @@ const levelClass: Record<string, string> = {
       }
     </div>
 
-    <!-- 其他技能：三列紧凑卡片 -->
+    <!-- 其他技能：三列紧凑卡片，同样用 flex 撑开 -->
     <div class="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
       {
         rest.map((group) => (
-          <div class="card reveal p-5">
+          <div class="card reveal flex flex-col p-5">
             <h3 class="text-sm font-semibold text-fog-50">{group.name}</h3>
-            <ul class="mt-4 space-y-3.5">
+            <ul class="mt-4 flex flex-1 flex-col justify-between gap-3.5">
               {group.items.map((item) => (
                 <li>
                   <div class="flex flex-wrap items-center gap-x-2 gap-y-1">

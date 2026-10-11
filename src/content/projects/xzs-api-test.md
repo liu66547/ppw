@@ -33,10 +33,30 @@ links:
     href: https://gitee.com/liu66547/xzs-api-test
     icon: gitee
 screenshots:
-  - src: /projects/sample-allure-report.png
-    alt: Allure 测试报告总览，显示 35 条用例全部通过
-    caption: 这是样例图，用来演示截图图集的排版效果。请替换成你自己 Allure 报告的真实截图 —— 这张图的价值在于面试官能直接看到 35 条用例 0 失败。
+  - src: /projects/allure-report.jpg
+    alt: Allure 测试报告总览页，35 条用例全部通过，通过率 100%
+    caption: Allure Overview —— 35 条用例、100% 通过率，右侧是跨 20 次构建的趋势图。Executor 显示 Jenkins，说明这是 CI 自动执行的结果而不是本地手动跑的。
     group: 测试报告
+
+  - src: /projects/allure-behaviors.jpg
+    alt: Allure Behaviors 页，用例按业务模块分层组织并标注通过数量
+    caption: Behaviors 视图 —— 用例按「任务 / 学科 / 登录 / 试卷 / 题目」五个业务模块分层，每层标注通过数。这样失败时能直接定位到具体业务模块，而不是在一堆用例名里翻找。
+    group: 测试报告
+
+  - src: /projects/jenkins-dashboard.jpg
+    alt: 'Jenkins 项目主页，显示 Allure 历史趋势图与第 14 到第 20 次构建的历史'
+    caption: 'Jenkins 流水线 —— Allure 历史趋势 + 构建记录。可以看到第 17、18 次构建红色（失败），随后第 19、20 次恢复绿色，说明失败告警和修复闭环是真实跑通的。'
+    group: 持续集成
+
+  - src: /projects/jenkins-email-alerts.png
+    alt: Jenkins 构建失败与恢复的邮件通知记录
+    caption: '邮件告警 —— 第 17 次构建 Failure 发出告警，第 19 次恢复后发出 Fixed 通知（状态未变化时不打扰）。这是 Jenkinsfile 里通知逻辑的实际效果。'
+    group: 持续集成
+
+  - src: /projects/project-structure.jpg
+    alt: IDE 中的项目目录结构，展示四层分层的包组织
+    caption: 四层架构在代码里的样子 —— api / common / data / test 四个包职责分离。接口层一个类对应一个模块，接口变更只需改这里，用例层零感知。
+    group: 代码结构
 ---
 
 ## 项目背景

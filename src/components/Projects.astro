@@ -2,37 +2,51 @@
 /**
  * 项目板块 —— 从 src/content/projects/ 自动读取
  * 加一个 .md 文件，这里就自动多一张卡片，不用改代码。
+ *
+ * 项目的实测数据（21 接口 / 35 用例 / 100% / 0 残留）作为本板块的抬头展示，
+ * 而不是放在首屏 —— 数据属于项目，不该抢首屏的位置。
  */
 import { getCollection } from 'astro:content';
+import StatsBar from './StatsBar.astro';
+import { profile } from '../data/profile';
 
 const projects = (await getCollection('projects'))
   .filter((p) => p.data.featured)
   .sort((a, b) => a.data.order - b.data.order);
 
-const linkIcon: Record<string, string> = {
-  github:
-    'M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 0-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.2.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.1 0 4.7-2.8 5.7-5.5 6 .4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3Z',
-};
+// 数据条展示的是接口自动化项目的成果
+const apiProject = projects.find((p) => p.id === 'xzs-api-test');
 ---
 
-<section id="projects" class="section">
+<section id="projects" class="section border-t border-ink-800">
   <div class="wrap">
-    <div class="flex flex-wrap items-end justify-between gap-4">
-      <div class="max-w-2xl">
-        <p class="eyebrow reveal">Projects</p>
-        <h2 class="h-section reveal mt-3">项目经历</h2>
-        <p class="reveal mt-4 text-sm leading-relaxed text-fog-400">
-          两个项目都是独立完成的：架构设计、编码、执行、缺陷定位与文档全流程。
-          点进去可以看到完整的架构说明、覆盖矩阵和缺陷证据。
-        </p>
-      </div>
+    <div class="max-w-2xl">
+      <p class="eyebrow reveal">Projects</p>
+      <h2 class="h-section reveal mt-3">项目经历</h2>
+      <p class="reveal mt-4 text-sm leading-relaxed text-fog-400">
+        两个项目都是独立完成的：架构设计、编码、用例执行、缺陷定位与文档全流程。
+        点进详情页可以看到完整的架构说明、覆盖矩阵和缺陷证据链。
+      </p>
     </div>
 
-    <div class="mt-10 space-y-6">
+    <!-- 实测数据：作为项目板块的抬头，明确归属 -->
+    {
+      apiProject && (
+        <div class="mt-9">
+          <StatsBar
+            stats={profile.stats}
+            scope={apiProject.data.title}
+            href={`/projects/${apiProject.id}/`}
+          />
+        </div>
+      )
+    }
+
+    <div class="mt-6 space-y-6">
       {
         projects.map((project) => {
           const d = project.data;
-          const href = `/projects/${project.id}`;
+          const href = `/projects/${project.id}/`;
           const isWip = d.status === 'in-progress';
 
           return (
@@ -101,7 +115,7 @@ const linkIcon: Record<string, string> = {
                       >
                         {l.icon === 'github' ? (
                           <svg class="size-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                            <path d={linkIcon.github} />
+                            <path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 0-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.2.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.1 0 4.7-2.8 5.7-5.5 6 .4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3Z" />
                           </svg>
                         ) : (
                           <svg
@@ -125,17 +139,13 @@ const linkIcon: Record<string, string> = {
                   </div>
                 </div>
 
-                {/* 右：关键数据 */}
+                {/* 右：关键结果 */}
                 <div class="border-t border-ink-700 bg-ink-850/50 p-6 md:p-8 lg:border-l lg:border-t-0">
-                  <p class="mono text-[11px] uppercase tracking-widest text-fog-500">
-                    关键结果
-                  </p>
-                  <dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-5 lg:grid-cols-1 lg:gap-y-5">
+                  <p class="mono text-[11px] uppercase tracking-widest text-fog-500">关键结果</p>
+                  <dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-5 lg:grid-cols-1">
                     {d.highlights.map((h) => (
                       <div>
-                        <dt class="mono text-xl font-bold text-accent-300 lg:text-2xl">
-                          {h.value}
-                        </dt>
+                        <dt class="mono text-xl font-bold text-accent-300 lg:text-2xl">{h.value}</dt>
                         <dd class="mt-0.5 text-xs text-fog-400">{h.label}</dd>
                       </div>
                     ))}

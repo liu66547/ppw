@@ -3,7 +3,10 @@ import { defineConfig } from 'astro/config';
 import tailwindcss from '@tailwindcss/vite';
 
 // 站点地址：部署绑定域名后改这里，然后重新部署即可
-export const SITE_URL = 'https://liudelin.vercel.app';
+// ⚠️ 改这里时，下面两处也要同步改（验收脚本会校验一致性）：
+//    src/data/profile.ts 的 site.url
+//    public/robots.txt 的 Sitemap 地址
+export const SITE_URL = 'https://len666.top';
 
 export default defineConfig({
   site: SITE_URL,
