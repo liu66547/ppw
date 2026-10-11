@@ -1,0 +1,16 @@
+# 统一行尾为 LF
+# 原因：Windows 默认 CRLF，而 Vercel/Linux 构建机用 LF。
+# 不统一的话，同一份代码在不同机器上会产生大量无意义的 diff。
+* text=auto eol=lf
+
+# 二进制文件不要做行尾转换，否则文件会损坏
+*.pdf binary
+*.woff2 binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+
+# 这些文件在 GitHub 上按语言高亮
+*.astro linguist-language=HTML
