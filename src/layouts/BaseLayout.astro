@@ -15,12 +15,19 @@ interface Props {
 }
 
 const { title, description = site.description, noindex = false } = Astro.props;
-const pageTitle = title ? `${title} · ${site.titleSuffix}` : site.titleSuffix;
+// 首页用 homeTitle 原文，子页面用「页面名 · 站点后缀」
+const pageTitle = title ? `${title} · ${site.titleSuffix}` : site.homeTitle;
 const canonical = new URL(Astro.url.pathname, Astro.site ?? site.url).href;
+
+/**
+ * 滚动吸附与 3D 斜向进入只对首页启用。
+ * 项目详情页内容很长，加了吸附会让人读不下去。
+ */
+const isHome = Astro.url.pathname === '/';
 ---
 
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" class:list={[isHome && 'snap-enabled']}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -95,6 +102,45 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? site.url).href;
         // 兜底：无论如何 2.5 秒后强制显示全部内容。
         // 入场动画是锦上添花，绝不能因为观察器出问题而让内容一直看不见。
         window.setTimeout(showAll, 2500);
+      }
+    </script>
+
+    <script>
+      /**
+       * 滚动吸附：只给「放得下」的板块打吸附点。
+       *
+       * 为什么用脚本判断而不是纯 CSS：
+       *   板块内容超过一屏时，强制吸附会把用户困在板块顶部、内容读不完。
+       *   这里测量每个板块高度，只有 ≤ 视口高 92% 的才开启吸附，
+       *   高内容板块自动豁免，可以自由滚动读完。
+       */
+      const snapEnabled = document.documentElement.classList.contains('snap-enabled');
+      const allowMotion = window.matchMedia('(prefers-reduced-motion: no-preference)').matches;
+
+      if (snapEnabled && allowMotion) {
+        const markSnapPoints = () => {
+          const limit = window.innerHeight * 0.92;
+          document.querySelectorAll('main > section').forEach((el) => {
+            const fits = el.getBoundingClientRect().height <= limit;
+            el.classList.toggle('snap-point', fits);
+          });
+        };
+
+        // 等字体与图片稳定后再测量，避免测到中间态
+        if (document.readyState === 'complete') {
+          markSnapPoints();
+        } else {
+          window.addEventListener('load', markSnapPoints, { once: true });
+        }
+
+        let resizeTimer: number | undefined;
+        window.addEventListener('resize', () => {
+          window.clearTimeout(resizeTimer);
+          resizeTimer = window.setTimeout(markSnapPoints, 200);
+        });
+      } else if (snapEnabled) {
+        // 用户偏好「减少动态效果」时直接关掉吸附
+        document.documentElement.classList.remove('snap-enabled');
       }
     </script>
   </body>

@@ -9,14 +9,13 @@ import { profile } from '../data/profile';
 
 /**
  * 首页板块顺序（按重要性和阅读节奏排）：
- *   1. Hero        —— 我是谁、在哪、怎么联系我
+ *   1. Hero        —— 我是谁、怎么联系我
  *   2. TechStack   —— 我的工具面有多宽（一眼扫完）
  *   3. Skills      —— 我的专业能力，每项都带"在哪用过"
- *   4. Advantages  —— 我为什么值得细看（四条有证据的优势）
- *   5. Projects    —— 项目经历 + 实测数据 + 跳转链接
+ *   4. Advantages  —— 四个维度的优势，每条都有证据
+ *   5. Projects    —— 项目经历（实测数据内嵌在各项目卡片里）
  *
- * 注意：项目的实测数据（21 接口 / 35 用例…）放在 Projects 板块内部，
- * 不放首屏 —— 数据属于项目，抢首屏位置会显得喧宾夺主。
+ * 所在地（深圳南山）按要求放在页面最下方的页脚，不占首屏。
  */
 
 // 结构化数据：帮助搜索引擎正确理解这是"一个人"，而不是一个公司网站
@@ -34,8 +33,7 @@ const personJsonLd = {
     addressLocality: profile.location.city,
     addressRegion: profile.location.district,
     addressCountry: 'CN',
-  },
-  alumniOf: {
+  },  alumniOf: {
     '@type': 'CollegeOrUniversity',
     name: profile.education.school,
   },

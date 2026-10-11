@@ -273,18 +273,87 @@ body {
   }
 }
 
-/* ── 卡片网格：让同行卡片底部对齐 ──────────────────────────
-   背景：技能板块是两列卡片，两列内容长度不同时，
-   短的那张会在底部留一块空白，看起来像没对齐。
+/* ══════════════════════════════════════════════════════════════
+   滚动吸附 + 3D 斜向进入
+   ──────────────────────────────────────────────────────────────
+   为什么用 proximity 而不是 mandatory：
+     这个站点有多个板块内容高度超过一屏（技能、项目）。mandatory 会强制
+     停在吸附点，用户滚到板块中间会被弹回顶部，内容根本读不完。
+     proximity 只在"接近吸附点"时吸附，既保留段落感，又不困住用户。
 
-   做法（对应 Skills.astro / Advantages.astro 里的 grid-subgrid）：
-   用 CSS 子网格让两张卡片共享同一组行轨道 —— 标题行对齐、列表行拉伸，
-   于是两张卡片底边天然齐平，且内部不留空。 */
-.card-rows > .card {
-  height: 100%;
+   为什么不做整屏 45° 旋转：
+     整屏旋转 + 滚动驱动实际观感是页面在晃，低端设备还会掉帧。
+     这里用「斜向位移为主 + 轻微旋转点缀」——有斜向进入的方向感，但不晃。
+   ══════════════════════════════════════════════════════════════ */
+
+/* 吸附容器：对首页生效，由 Layout 在 body 上加 .snap-enabled */
+.snap-enabled {
+  scroll-snap-type: y proximity;
 }
 
-/* ── 项目详情页正文排版（Markdown 渲染出来的内容） ──────── */
+/* 只有放得下的板块才吸附（由脚本测量后打标），高内容板块向上滚动时自动豁免 */
+.snap-point {
+  scroll-snap-align: start;
+  scroll-snap-stop: normal;
+}
+
+/* 3D 斜向进入：仅在浏览器支持滚动驱动动画时启用 */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    main {
+      /* 统一的透视点，让所有板块的 3D 效果一致 */
+      perspective: 1400px;
+      perspective-origin: 50% 45%;
+    }
+
+    .tilt-in {
+      transform-style: preserve-3d;
+      /* 进度 0 → 1：板块从下方斜着推进来，抬起、转正 */
+      animation: tilt-in linear both;
+      animation-timeline: view();
+      animation-range: entry 5% cover 32%;
+    }
+
+    /* 左右交替斜入，避免整页朝一个方向倒 */
+    .tilt-in:nth-child(odd) {
+      --tilt-sign: 1;
+    }
+    .tilt-in:nth-child(even) {
+      --tilt-sign: -1;
+    }
+
+    @keyframes tilt-in {
+      from {
+        opacity: 0;
+        transform: translate3d(calc(var(--tilt-sign, 1) * 4.5rem), 5rem, -110px)
+          rotateZ(calc(var(--tilt-sign, 1) * -2.2deg)) rotateY(calc(var(--tilt-sign, 1) * 1.6deg));
+      }
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+  }
+}
+
+/* 不支持滚动驱动动画时，退回原来的淡入（同一套 .reveal 机制） */
+@supports not (animation-timeline: view()) {
+  .tilt-in {
+    opacity: 0;
+    transform: translate3d(2.5rem, 2.5rem, 0);
+    transition:
+      opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .tilt-in.is-visible {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   项目详情页正文排版（Markdown 渲染出来的内容）
+   ══════════════════════════════════════════════════════════════ */
 
 .prose-tech {
   color: var(--color-fog-200);

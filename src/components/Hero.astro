@@ -52,17 +52,19 @@ const contacts = [
         </span>
       </h1>
 
-      <!-- 身份信息行：只放访客真正关心的事实 -->
+      <!-- 身份信息行：只放访客真正关心的事实（所在地已移到页脚） -->
       <p class="hero-in mono mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-fog-500">
-        <span class="inline-flex items-center gap-1.5 text-fog-400">
+        <span class="inline-flex items-center gap-1.5">
           <svg class="size-3.5 text-accent-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
-            <circle cx="12" cy="10" r="3" />
+            <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+            <path d="M6 12v5c3 3 9 3 12 0v-5" />
           </svg>
-          现居 {profile.location.full}
+          {profile.education.school} · {profile.education.degree}
         </span>
         <span class="text-ink-600" aria-hidden="true">/</span>
-        <span>{profile.education.year} · {profile.education.note}</span>
+        <span>{profile.education.range}</span>
+        <span class="text-ink-600" aria-hidden="true">/</span>
+        <span>{profile.education.note}</span>
       </p>
 
       <p class="hero-in mt-7 max-w-2xl text-base leading-relaxed text-fog-200 sm:text-lg">

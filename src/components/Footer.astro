@@ -56,14 +56,26 @@ const links = [
           这些问题我都很乐意展开聊，也欢迎直接翻我的仓库。
         </p>
 
-        <!-- 所在地 -->
-        <p class="mt-6 inline-flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-850 px-3.5 py-2 text-sm text-fog-200">
-          <svg class="size-4 text-accent-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
-            <circle cx="12" cy="10" r="3" />
-          </svg>
-          现居 <span class="font-medium text-fog-50">{profile.location.full}</span>
-        </p>
+        <!-- 所在地：按要求放在页面最下方区域 -->
+        <div class="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <p class="inline-flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-850 px-3.5 py-2 text-sm text-fog-200">
+            <svg class="size-4 text-accent-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+            现居 <span class="font-medium text-fog-50">{profile.location.full}</span>
+          </p>
+          <p class="inline-flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-850 px-3.5 py-2 text-sm text-fog-200">
+            <svg class="size-4 text-accent-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+              <path d="M6 12v5c3 3 9 3 12 0v-5" />
+            </svg>
+            {profile.education.school}
+            <span class="text-fog-400">
+              {profile.education.major} · {profile.education.degree}
+            </span>
+          </p>
+        </div>
 
         <div class="mt-7 flex flex-wrap gap-3">
           <a href={`mailto:${profile.contact.email}`} class="btn btn-primary">
@@ -130,11 +142,11 @@ const links = [
     </div>
 
     <div
-      class="mt-14 flex flex-col gap-3 border-t border-ink-800 pt-6 text-xs text-fog-500 sm:flex-row sm:items-center sm:justify-between"
+      class="mt-14 flex flex-col gap-2 border-t border-ink-800 pt-6 text-xs text-fog-500 sm:flex-row sm:items-center sm:justify-between"
     >
-      <p>© {year} {profile.name} · 用 Astro 构建</p>
+      <p>© {year} {profile.name}</p>
       <p class="mono">
-        {profile.education.school} · {profile.education.major} · {profile.education.year}
+        {profile.education.school} · {profile.education.major} · {profile.education.degree} · {profile.education.range}
       </p>
     </div>
   </div>

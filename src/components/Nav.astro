@@ -24,16 +24,15 @@ const toHref = (href: string) => (isHome ? href.replace('/', '') : href);
   class="sticky top-0 z-40 border-b border-ink-800/80 bg-ink-950/70 backdrop-blur-md transition-colors duration-300"
 >
   <div class="wrap flex h-16 items-center justify-between gap-4">
-    <!-- 左：姓名标识 -->
+    <!-- 左：站点标识 -->
     <a href="/" class="group flex items-center gap-2.5" aria-label="返回首页">
       <span
         class="grid size-8 place-items-center rounded-lg border border-accent-500/40 bg-accent-500/10 font-mono text-[13px] font-bold text-accent-300 transition-colors group-hover:border-accent-400 group-hover:bg-accent-500/20"
       >
-        刘
+        {profile.nick}
       </span>
       <span class="hidden text-sm font-semibold text-fog-50 sm:block">
-        {profile.name}
-        <span class="ml-1.5 font-normal text-fog-500">/ {profile.title}</span>
+        啉 · 个人介绍
       </span>
     </a>
 
