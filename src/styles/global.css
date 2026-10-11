@@ -65,13 +65,7 @@ body {
   font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* 顶部一层极淡的青绿光晕，避免纯黑发死 */
-  background-image: radial-gradient(
-    ellipse 80% 50% at 50% -10%,
-    rgba(20, 184, 166, 0.09),
-    transparent 70%
-  );
-  background-repeat: no-repeat;
+  /* 顶部光晕由 <div class="aurora"> 统一负责，这里不再叠一层，避免亮度叠加过曝 */
 }
 
 ::selection {
@@ -348,6 +342,101 @@ body {
   .tilt-in.is-visible {
     opacity: 1;
     transform: none;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   背景纹理与光晕
+   ──────────────────────────────────────────────────────────────
+   设计取舍：
+     1. 用「点阵」而不是「方块网格」—— 点阵字重更轻，长时间看不累，
+        也不会像网格那样在视觉上和内容抢注意力。
+     2. 光晕做「极慢漂移 + 呼吸」（24s 周期，位移仅 3%）——
+        静态背景滚到中段会显得页面"死了"；但位移必须小到无法被主动察觉，
+        只在潜意识里让页面显得是活的。
+     3. 不做斜向光束：板块进入方向已经是斜的，背景再来一条固定斜线，
+        两个斜向运动会互相打架，而且光束扫过文字直接损害阅读。
+   ══════════════════════════════════════════════════════════════ */
+
+/* 点阵纹理 */
+.bg-dots {
+  background-image: radial-gradient(rgba(139, 154, 177, 0.16) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* 更密的点阵，用于小面积装饰（卡片占位头部等） */
+.bg-dots-sm {
+  background-image: radial-gradient(rgba(139, 154, 177, 0.13) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+/* 顶部光晕：整页共用一个，固定在视口上，缓慢漂移呼吸 */
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.aurora::before,
+.aurora::after {
+  content: '';
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(120px);
+}
+
+/* 主光晕：青绿，从顶部中间偏左 */
+.aurora::before {
+  top: -18rem;
+  left: 50%;
+  width: 46rem;
+  height: 30rem;
+  margin-left: -27rem;
+  background: radial-gradient(ellipse at center, rgba(20, 184, 166, 0.14), transparent 68%);
+  animation: aurora-drift-a 24s ease-in-out infinite;
+}
+
+/* 副光晕：靛蓝，从右下角，给页面一点纵深 */
+.aurora::after {
+  right: -12rem;
+  bottom: -10rem;
+  width: 34rem;
+  height: 26rem;
+  background: radial-gradient(ellipse at center, rgba(14, 165, 233, 0.09), transparent 70%);
+  animation: aurora-drift-b 31s ease-in-out infinite;
+}
+
+@keyframes aurora-drift-a {
+  0%,
+  100% {
+    transform: translate3d(-3%, 0, 0) scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: translate3d(3%, 1.5rem, 0) scale(1.06);
+    opacity: 1;
+  }
+}
+
+@keyframes aurora-drift-b {
+  0%,
+  100% {
+    transform: translate3d(0, 2%, 0) scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate3d(-2.5%, -2%, 0) scale(1.08);
+    opacity: 0.95;
+  }
+}
+
+/* 减少动态效果时，光晕静止不动 */
+@media (prefers-reduced-motion: reduce) {
+  .aurora::before,
+  .aurora::after {
+    animation: none;
   }
 }
 
