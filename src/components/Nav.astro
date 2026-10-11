@@ -1,0 +1,119 @@
+---
+/**
+ * 顶部导航栏：滚动时变半透明毛玻璃
+ * 移动端用原生 <details> 做抽屉菜单，不依赖 JS 框架
+ */
+import { profile } from '../data/profile';
+
+const navItems = [
+  { href: '/#skills', label: '技能' },
+  { href: '/#projects', label: '项目' },
+  { href: '/#principles', label: '方法论' },
+  { href: '/#contact', label: '联系' },
+];
+
+const pathname = Astro.url.pathname;
+const isHome = pathname === '/';
+// 在子页面时，导航回到首页对应区块
+const toHref = (href: string) => (isHome ? href.replace('/', '') : href);
+---
+
+<header
+  id="site-nav"
+  class="sticky top-0 z-40 border-b border-ink-800/80 bg-ink-950/70 backdrop-blur-md transition-colors duration-300"
+>
+  <div class="wrap flex h-16 items-center justify-between gap-4">
+    <!-- 左：姓名标识 -->
+    <a href="/" class="group flex items-center gap-2.5" aria-label="返回首页">
+      <span
+        class="grid size-8 place-items-center rounded-lg border border-accent-500/40 bg-accent-500/10 font-mono text-[13px] font-bold text-accent-300 transition-colors group-hover:border-accent-400 group-hover:bg-accent-500/20"
+      >
+        刘
+      </span>
+      <span class="hidden text-sm font-semibold text-fog-50 sm:block">
+        {profile.name}
+        <span class="ml-1.5 font-normal text-fog-500">/ {profile.title}</span>
+      </span>
+    </a>
+
+    <!-- 中：桌面端导航 -->
+    <nav class="hidden items-center gap-1 md:flex" aria-label="主导航">
+      {
+        navItems.map((item) => (
+          <a
+            href={toHref(item.href)}
+            class="rounded-lg px-3 py-1.5 text-sm text-fog-400 transition-colors hover:bg-ink-850 hover:text-fog-50"
+          >
+            {item.label}
+          </a>
+        ))
+      }
+    </nav>
+
+    <!-- 右：简历下载 + 移动端菜单 -->
+    <div class="flex items-center gap-2">
+      <a
+        href={profile.contact.resumeFile}
+        download
+        class="btn btn-primary hidden !px-3.5 !py-2 !text-[13px] sm:inline-flex"
+      >
+        <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+        下载简历
+      </a>
+
+      <details class="relative md:hidden">
+        <summary
+          class="grid size-9 cursor-pointer list-none place-items-center rounded-lg border border-ink-700 bg-ink-850 text-fog-200 transition-colors hover:border-accent-500 hover:text-accent-300 [&::-webkit-details-marker]:hidden"
+          aria-label="打开菜单"
+        >
+          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </summary>
+        <nav
+          class="absolute right-0 top-11 w-44 overflow-hidden rounded-xl border border-ink-700 bg-ink-900 p-1.5 shadow-2xl shadow-ink-950/80"
+          aria-label="移动端导航"
+        >
+          {
+            navItems.map((item) => (
+              <a
+                href={toHref(item.href)}
+                class="block rounded-lg px-3 py-2 text-sm text-fog-200 transition-colors hover:bg-ink-850 hover:text-accent-300"
+              >
+                {item.label}
+              </a>
+            ))
+          }
+          <a
+            href={profile.contact.resumeFile}
+            download
+            class="mt-1 block rounded-lg bg-accent-500/90 px-3 py-2 text-sm font-semibold text-ink-950"
+          >
+            下载简历
+          </a>
+        </nav>
+      </details>
+    </div>
+  </div>
+</header>
+
+<script>
+  // 滚动后加深导航栏底色，避免和内容混在一起
+  const nav = document.getElementById('site-nav');
+  if (nav) {
+    const onScroll = () => {
+      const scrolled = window.scrollY > 12;
+      nav.classList.toggle('bg-ink-950/90', scrolled);
+      nav.classList.toggle('bg-ink-950/70', !scrolled);
+      nav.classList.toggle('border-ink-700', scrolled);
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+  }
+</script>

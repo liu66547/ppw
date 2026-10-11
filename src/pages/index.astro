@@ -1,0 +1,45 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Hero from '../components/Hero.astro';
+import StatsBar from '../components/StatsBar.astro';
+import Skills from '../components/Skills.astro';
+import Projects from '../components/Projects.astro';
+import Principles from '../components/Principles.astro';
+import { profile } from '../data/profile';
+
+// 结构化数据：帮助搜索引擎正确理解这是"一个人"，而不是一个公司网站
+const personJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Person',
+  name: profile.name,
+  alternateName: profile.nameEn,
+  jobTitle: profile.title,
+  email: `mailto:${profile.contact.email}`,
+  url: Astro.site?.href,
+  sameAs: [profile.contact.github, profile.contact.gitee],
+  alumniOf: {
+    '@type': 'CollegeOrUniversity',
+    name: profile.education.school,
+  },
+  knowsAbout: [
+    '接口自动化测试',
+    'UI 自动化测试',
+    'Selenium WebDriver',
+    'RestAssured',
+    'TestNG',
+    'Jenkins',
+    'Allure',
+  ],
+};
+---
+
+<BaseLayout>
+  <script type="application/ld+json" set:html={JSON.stringify(personJsonLd)} />
+
+  <Hero />
+  <StatsBar />
+
+  <Skills />
+  <Projects />
+  <Principles />
+</BaseLayout>

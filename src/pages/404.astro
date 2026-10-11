@@ -1,0 +1,84 @@
+---
+/**
+ * 404 页面
+ * 用「测试报告」的语义来写错误页 —— 和整站气质一致，也不会让访客觉得网站坏了。
+ */
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+// 站点已存在的路径，给访客指路
+const suggestions = [
+  { href: '/', label: '首页', note: '个人简介、技能、项目概览' },
+  { href: '/projects/xzs-api-test', label: '学之思考试系统 · 接口自动化测试', note: '四层架构、21 接口覆盖、缺陷证据链' },
+  { href: '/projects/bilibili-ui-test', label: 'B 站 Web 端 · UI 自动化测试', note: 'Page Object 分层框架' },
+];
+---
+
+<BaseLayout
+  title="404 · 页面不存在"
+  description="页面不存在 —— 请从首页重新导航。"
+>
+  <section class="relative overflow-hidden">
+    <div class="pointer-events-none absolute inset-0 bg-grid mask-fade" aria-hidden="true"></div>
+
+    <div class="wrap relative py-20 md:py-28">
+      <div class="max-w-2xl">
+        <p class="eyebrow">404 Not Found</p>
+
+        <h1 class="mt-4 text-4xl font-bold tracking-tight text-fog-50 md:text-5xl">
+          这条用例<span class="text-fail">失败了</span>
+        </h1>
+
+        <p class="mono mt-5 rounded-lg border border-ink-700 bg-ink-900 px-4 py-3 text-[13px] leading-relaxed text-fog-400">
+          <span class="text-fail">✗</span> 请求的路径不存在<br />
+          <span class="text-fog-500">期望：</span>一个存在的页面<br />
+          <span class="text-fog-500">实际：</span>404 —— 该地址没有对应内容
+        </p>
+
+        <p class="mt-6 text-sm leading-relaxed text-fog-400">
+          可能是链接写错了，或者这个页面被移动过。下面这几个地址一定存在：
+        </p>
+
+        <ul class="mt-6 space-y-3">
+          {
+            suggestions.map((s) => (
+              <li>
+                <a
+                  href={s.href}
+                  class="card card-hoverable group flex items-center justify-between gap-4 p-4"
+                >
+                  <span>
+                    <span class="block text-sm font-semibold text-fog-50 transition-colors group-hover:text-accent-300">
+                      {s.label}
+                    </span>
+                    <span class="mt-0.5 block text-xs text-fog-500">{s.note}</span>
+                  </span>
+                  <svg
+                    class="size-4 shrink-0 text-fog-500 transition-all group-hover:translate-x-0.5 group-hover:text-accent-400"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                    <polyline points="12 5 19 12 12 19" />
+                  </svg>
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+
+        <a href="/" class="btn btn-primary mt-8">
+          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg>
+          回到首页
+        </a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

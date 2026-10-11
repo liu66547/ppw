@@ -1,0 +1,83 @@
+---
+/**
+ * 页脚：联系方式 + 简历下载
+ */
+import { profile } from '../data/profile';
+
+const year = new Date().getFullYear();
+
+const links = [
+  { label: 'GitHub', href: profile.contact.github, handle: '@liu66547' },
+  { label: 'Gitee', href: profile.contact.gitee, handle: '@liu66547' },
+  { label: '邮箱', href: `mailto:${profile.contact.email}`, handle: profile.contact.email },
+];
+---
+
+<footer id="contact" class="border-t border-ink-800 bg-ink-900/40">
+  <div class="wrap py-14">
+    <div class="grid gap-10 md:grid-cols-[1.2fr_1fr]">
+      <!-- 左：行动号召 -->
+      <div>
+        <p class="eyebrow">Contact</p>
+        <h2 class="mt-3 text-2xl font-bold tracking-tight text-fog-50 md:text-3xl">
+          想聊聊？我随时可以聊测试
+        </h2>
+        <p class="mt-3 max-w-md text-sm leading-relaxed text-fog-400">
+          正在寻找 <span class="text-accent-300">2027 届测试开发 / 自动化测试实习</span> 机会。
+          对我的项目有任何疑问，或者想看看具体代码，欢迎直接联系。
+        </p>
+
+        <div class="mt-6 flex flex-wrap gap-3">
+          <a href={`mailto:${profile.contact.email}`} class="btn btn-primary">
+            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="2" y="4" width="20" height="16" rx="2" />
+              <path d="m22 7-10 6L2 7" />
+            </svg>
+            发邮件
+          </a>
+          <a href={profile.contact.resumeFile} download class="btn btn-ghost">
+            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            下载简历 PDF
+          </a>
+        </div>
+      </div>
+
+      <!-- 右：链接列表 -->
+      <div class="md:justify-self-end">
+        <p class="mono text-xs uppercase tracking-widest text-fog-500">Find me</p>
+        <ul class="mt-3 space-y-2.5">
+          {
+            links.map((l) => (
+              <li>
+                <a
+                  href={l.href}
+                  target={l.href.startsWith('mailto:') ? undefined : '_blank'}
+                  rel={l.href.startsWith('mailto:') ? undefined : 'noopener noreferrer'}
+                  class="group flex items-baseline gap-3 text-sm"
+                >
+                  <span class="w-14 shrink-0 text-fog-500">{l.label}</span>
+                  <span class="mono text-fog-200 transition-colors group-hover:text-accent-300">
+                    {l.handle}
+                  </span>
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </div>
+
+    <div
+      class="mt-12 flex flex-col gap-3 border-t border-ink-800 pt-6 text-xs text-fog-500 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <p>© {year} {profile.name} · 用 Astro 构建</p>
+      <p class="mono">
+        {profile.education.school} · {profile.education.major} · {profile.education.year}
+      </p>
+    </div>
+  </div>
+</footer>

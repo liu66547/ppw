@@ -1,0 +1,32 @@
+---
+/**
+ * 核心数据条 —— 数字自带说服力，是纯文字简历给不了的
+ */
+import { profile } from '../data/profile';
+---
+
+<section class="border-y border-ink-800 bg-ink-900/50">
+  <div class="wrap py-10 md:py-12">
+    <p class="mono text-center text-xs uppercase tracking-[0.18em] text-fog-500">
+      接口自动化测试项目 · 实测数据
+    </p>
+
+    <dl class="mt-8 grid grid-cols-2 gap-x-6 gap-y-8 md:grid-cols-4">
+      {
+        profile.stats.map((s) => (
+          <div class="reveal text-center">
+            <dt class="sr-only">{s.label}</dt>
+            <dd>
+              <p class="mono text-3xl font-bold tracking-tight text-accent-300 md:text-4xl">
+                {s.value}
+                <span class="ml-0.5 text-lg font-medium text-accent-500/80 md:text-xl">{s.suffix}</span>
+              </p>
+              <p class="mt-2 text-sm font-medium text-fog-50">{s.label}</p>
+              <p class="mt-0.5 text-xs text-fog-500">{s.note}</p>
+            </dd>
+          </div>
+        ))
+      }
+    </dl>
+  </div>
+</section>

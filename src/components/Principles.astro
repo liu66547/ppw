@@ -1,0 +1,46 @@
+---
+/**
+ * 测试方法论 —— 这是本网站最重要的差异化板块。
+ * 会写 Selenium 的实习生很多，能讲清楚"怎么保证用例不假绿"的很少。
+ */
+import { principles } from '../data/skills';
+---
+
+<section id="principles" class="section border-y border-ink-800 bg-ink-900/40">
+  <div class="wrap">
+    <div class="max-w-2xl">
+      <p class="eyebrow reveal">Methodology</p>
+      <h2 class="h-section reveal mt-3">我怎么保证测试结果是可信的</h2>
+      <p class="reveal mt-4 text-sm leading-relaxed text-fog-400">
+        自动化测试最大的风险不是"跑不起来"，而是<span class="text-accent-300">"跑绿了但没测到"</span>。
+        以下六条是我在项目里实际执行的规范，每条都写进了框架机制，而不是停留在文档里。
+      </p>
+    </div>
+
+    <div class="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+      {
+        principles.map((p, i) => (
+          <article class="card reveal flex flex-col p-6">
+            <div class="flex items-start justify-between gap-3">
+              <h3 class="text-[15px] font-semibold leading-snug text-fog-50">{p.title}</h3>
+              <span class="mono shrink-0 text-xs text-ink-600">
+                {String(i + 1).padStart(2, '0')}
+              </span>
+            </div>
+
+            <p class="mt-2.5 text-[13px] font-medium text-accent-300">{p.summary}</p>
+
+            <p class="mt-3 text-[13px] leading-relaxed text-fog-400">{p.detail}</p>
+          </article>
+        ))
+      }
+    </div>
+
+    <p class="reveal mt-8 flex items-start gap-2.5 text-xs leading-relaxed text-fog-500">
+      <span class="mt-1.5 size-1 shrink-0 rounded-full bg-accent-500" aria-hidden="true"></span>
+      <span>
+        完整实践记录见项目详情页的「测试设计原则」章节；这些规范的具体实现代码可在仓库中查阅。
+      </span>
+    </p>
+  </div>
+</section>
