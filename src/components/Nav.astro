@@ -23,6 +23,14 @@ const toHref = (href: string) => (isHome ? href.replace('/', '') : href);
   id="site-nav"
   class="sticky top-0 z-40 border-b border-ink-800/80 bg-ink-950/70 backdrop-blur-md transition-colors duration-300"
 >
+  <!-- 阅读进度条：贴在导航底部，随滚动推进 -->
+  <div
+    id="read-progress"
+    class="absolute inset-x-0 bottom-0 h-px origin-left scale-x-0 bg-gradient-to-r from-accent-500 via-accent-400 to-azure-400"
+    aria-hidden="true"
+  >
+  </div>
+
   <div class="wrap flex h-16 items-center justify-between gap-4">
     <!-- 左：站点标识 -->
     <a href="/" class="group flex items-center gap-2.5" aria-label="返回首页">
@@ -115,5 +123,47 @@ const toHref = (href: string) => (isHome ? href.replace('/', '') : href);
     };
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
+  }
+
+  /**
+   * 阅读进度条
+   * 用 transform: scaleX 而不是 width —— 只触发合成层，不引起重排，
+   * 滚动时不会掉帧。配合 transform-origin: left 从左往右推进。
+   */
+  const bar = document.getElementById('read-progress');
+  if (bar && window.matchMedia('(prefers-reduced-motion: no-preference)').matches) {
+    let ticking = false;
+
+    const update = () => {
+      const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+      const ratio = scrollable > 0 ? window.scrollY / scrollable : 0;
+      bar.style.transform = `scaleX(${Math.min(1, Math.max(0, ratio))})`;
+      ticking = false;
+    };
+
+    const schedule = () => {
+      if (!ticking) {
+        ticking = true;
+        window.requestAnimationFrame(update);
+      }
+    };
+
+    update();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule, { passive: true });
+
+    /**
+     * 页面高度会变 —— 图片懒加载完成、折叠块展开、字体切换都会改变文档高度。
+     * 只在 scroll/resize 时算比例的话，用户滚到底部可能只显示 70% 左右，
+     * 看起来像卡住了。这里监听文档尺寸变化，随时重算。
+     */
+    if ('ResizeObserver' in window) {
+      new ResizeObserver(schedule).observe(document.body);
+    }
+    // 兜底：图片加载完成的时机不一定触发 ResizeObserver
+    window.addEventListener('load', schedule, { once: true });
+    document.querySelectorAll('img[loading="lazy"]').forEach((img) => {
+      img.addEventListener('load', schedule, { once: true });
+    });
   }
 </script>

@@ -63,6 +63,36 @@ const projects = defineCollection({
     featured: z.boolean().default(true),
 
     /**
+     * 「30 秒看懂」摘要 —— 详情页首屏的核心结论卡片
+     *
+     * 为什么需要：详情页正文有 3000+ 字，第一次来的人不知道重点在哪。
+     * 这个卡片用三四条把「做了什么、有什么证据、结论是什么」讲完，
+     * 想深入的人再往下读正文。
+     */
+    verdict: z
+      .object({
+        /** 一句话结论，最醒目的那句 */
+        headline: z.string(),
+        /** 2-4 条要点，每条都要是结论而不是描述 */
+        points: z.array(z.string()).default([]),
+      })
+      .optional(),
+
+    /**
+     * 证据索引 —— 告诉访客「想验证的话去哪儿看」
+     * 每条是一个可点击的外部链接（仓库、报告、构建记录等）
+     */
+    evidence: z
+      .array(
+        z.object({
+          label: z.string(),
+          detail: z.string(),
+          href: z.string().url().optional(),
+        }),
+      )
+      .default([]),
+
+    /**
      * 项目截图 —— 这是最有说服力的部分，强烈建议放。
      *
      * 图片放在 public/projects/ 目录下，src 写以 / 开头的绝对路径：

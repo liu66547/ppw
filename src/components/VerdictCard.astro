@@ -1,0 +1,115 @@
+---
+/**
+ * 详情页的「30 秒看懂」卡片
+ *
+ * 为什么需要它：
+ *   详情页正文 3000+ 字，第一次来的人不知道重点在哪，容易直接关掉。
+ *   这个卡片用一句话结论 + 3 条要点 + 证据索引，把「做了什么、凭什么、
+ *   想验证去哪儿看」讲完。想深入的人再往下读正文。
+ */
+interface Props {
+  headline: string;
+  points: readonly string[];
+  evidence: readonly { label: string; detail: string; href?: string }[];
+}
+
+const { headline, points, evidence } = Astro.props;
+---
+
+<section class="border-b border-ink-800 bg-ink-900/40">
+  <div class="wrap py-10 md:py-12">
+    <div class="grid gap-8 lg:grid-cols-[1.35fr_1fr]">
+      <!-- 左：一句话结论 + 要点 -->
+      <div>
+        <p class="eyebrow">TL;DR · 30 秒看懂</p>
+
+        <p class="mt-4 text-lg font-semibold leading-relaxed text-fog-50 md:text-xl">
+          {headline}
+        </p>
+
+        <ul class="mt-6 space-y-3.5">
+          {
+            points.map((pt) => (
+              <li class="flex gap-3 text-sm leading-relaxed text-fog-200">
+                <svg
+                  class="mt-0.5 size-4 shrink-0 text-accent-400"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                <span set:html={pt} />
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+
+      <!-- 右：证据索引 —— 想验证去哪儿看 -->
+      {
+        evidence.length > 0 && (
+          <div class="lg:border-l lg:border-ink-700 lg:pl-8">
+            <p class="mono text-[11px] uppercase tracking-widest text-fog-500">
+              想验证？去哪儿看
+            </p>
+
+            <ul class="mt-4 space-y-2.5">
+              {evidence.map((e) => {
+                const Tag = e.href ? 'a' : 'div';
+                return (
+                  <li>
+                    <Tag
+                      href={e.href}
+                      target={e.href ? '_blank' : undefined}
+                      rel={e.href ? 'noopener noreferrer' : undefined}
+                      class:list={[
+                        'flex items-start gap-3 rounded-lg border border-ink-700 bg-ink-850 px-3.5 py-3',
+                        e.href &&
+                          'group transition-colors hover:border-accent-500/60 hover:bg-ink-800',
+                      ]}
+                    >
+                      <span class="min-w-0 flex-1">
+                        <span class="block text-[13px] font-medium text-fog-100">
+                          {e.label}
+                        </span>
+                        <span class="mt-0.5 block text-[11px] leading-relaxed text-fog-500">
+                          {e.detail}
+                        </span>
+                      </span>
+
+                      {e.href && (
+                        <svg
+                          class="mt-0.5 size-3.5 shrink-0 text-ink-600 transition-all group-hover:translate-x-0.5 group-hover:text-accent-400"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                          <polyline points="15 3 21 3 21 9" />
+                          <line x1="10" y1="14" x2="21" y2="3" />
+                        </svg>
+                      )}
+                    </Tag>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <p class="mt-4 text-[11px] leading-relaxed text-fog-500">
+              所有数字与结论都能在以上来源中核对。
+            </p>
+          </div>
+        )
+      }
+    </div>
+  </div>
+</section>

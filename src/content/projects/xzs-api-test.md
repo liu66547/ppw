@@ -32,6 +32,23 @@ links:
   - label: Gitee
     href: https://gitee.com/liu66547/xzs-api-test
     icon: gitee
+verdict:
+  headline: 这不是"把 21 个接口跑一遍"，而是建立一套让绿灯可信的机制。
+  points:
+    - 覆盖管理端 <strong>6 大模块 21 个接口</strong>，沉淀 35 条用例，覆盖率与通过率均为 100%
+    - 测试数据由用例现场自造、栈式逆序清理，执行后 SQL 对账校验残留为 <strong>0 行</strong>；不依赖环境预置数据，clone 即可运行
+    - 落地双侧证据、契约型/记录型断言、禁条件断言等规范，<strong>从机制上防止用例假绿</strong>
+    - 发现 <strong>6 类可复现缺陷</strong>并留存完整证据链，含引用完整性缺失导致 500、堆栈定位到具体代码行
+evidence:
+  - label: 完整架构与覆盖矩阵
+    detail: 本页下方「架构设计」「接口覆盖矩阵」两节
+  - label: 缺陷证据链
+    detail: 请求响应、后端异常堆栈、SQL 实证 —— 见「缺陷与系统级发现」
+  - label: 持续集成记录
+    detail: Jenkins 构建历史与 Allure 报告，可在仓库与下方截图核对
+  - label: 源码
+    href: https://github.com/liu66547/xzs-api-test
+    detail: 四层架构实现、数据工厂与清理机制
 screenshots:
   - src: /projects/allure-report.jpg
     alt: Allure 测试报告总览页，35 条用例全部通过，通过率 100%
@@ -133,7 +150,8 @@ xzs-api-test/
 
 4. **参数化环境** —— `base.uri` 通过 `-Dbase.uri=` 注入，本地 / 测试 / 预发一键切换，一套用例多环境执行。
 
-## 接口覆盖矩阵（21 / 21）
+<details>
+<summary>接口覆盖矩阵 —— 6 大模块 21 个接口的逐项覆盖情况</summary>
 
 | 模块 | 接口数 | 覆盖 | 重点场景 |
 | --- | --- | --- | --- |
@@ -147,6 +165,8 @@ xzs-api-test/
 
 > 答卷模块为结构级覆盖：答卷数据由学生端"考试提交"流程产生，管理端无造数通道。
 > 后续可扩展学生端"开考 → 交卷 → 成绩"全流程用例。
+
+</details>
 
 ## 测试设计原则
 
@@ -167,7 +187,8 @@ xzs-api-test/
 - **数据治理规范**：测试数据统一 `zz_` 前缀 + 时间戳保证唯一；
   执行后以 SQL 对账（`zz_%` 且 `deleted=0` 应为空）验收清理效果。
 
-## 缺陷与系统级发现
+<details>
+<summary>缺陷与系统级发现 —— 6 类可复现缺陷 · 3 条系统级观察 · 4 项设计特性确认 · 完整证据链</summary>
 
 > 全部发现均经可复现实验确认，请求 / 响应、后端异常堆栈、SQL 日志已留存证据。
 
@@ -208,7 +229,10 @@ xzs-api-test/
 - **事务兜底**：编辑中途异常自动回滚，不留半截脏数据；
 - **分页输出结构全站统一**（MyBatis 分页插件），空集形状一致。
 
-## 如何运行
+</details>
+
+<details>
+<summary>如何运行（前置条件、命令与数据对账 SQL）</summary>
 
 **前置条件**：JDK 8+、Maven 3.x、本地已启动的 xzs 服务（默认 `http://localhost:8000`）及 MySQL。
 
@@ -235,6 +259,8 @@ SELECT id FROM t_exam_paper WHERE name  LIKE 'zz_%' AND deleted = 0;
 SELECT id FROM t_task_exam  WHERE title LIKE 'zz_%' AND deleted = 0;
 ```
 
+</details>
+
 ## 持续集成与测试报告
 
 **Jenkins Declarative Pipeline**（仓库根目录 `Jenkinsfile`）：
@@ -257,9 +283,12 @@ SELECT id FROM t_task_exam  WHERE title LIKE 'zz_%' AND deleted = 0;
    （Docker Compose），实现任意环境一键全链路回归；
 3. **后续方向** —— 业务流联动用例（一条流程串联多接口）、被测服务日志自动关联到测试报告。
 
-## 项目声明
+<details>
+<summary>项目声明（个人独立项目 · AI 工具使用说明）</summary>
 
 本项目为**个人独立项目**，全部架构设计、编码实现、用例执行、缺陷发现与文档撰写均由本人独立完成，无其他协作成员。
 
 关于 AI 工具的使用：本文档依据作者在测试过程中沉淀的缺陷发现与复盘记录整理成文，部分行文经 AI 工具辅助润色；
 **测试代码、缺陷定位、实验数据、缺陷证据与结论均来源于本人的实际测试过程。**
+
+</details>

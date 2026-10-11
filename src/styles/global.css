@@ -440,6 +440,67 @@ body {
   }
 }
 
+/* ── 可折叠区块 ────────────────────────────────────────────
+   用途：把「如何运行」「项目声明」这类查阅型内容默认收起。
+   详情页正文 3000+ 字，全部平铺会让人找不到重点；
+   折叠后首屏只留结论与核心论证，想深入的人再展开。
+
+   用原生 <details>，浏览器自带展开/收起与键盘可达性。 */
+.prose-tech details {
+  margin-top: 1.75rem;
+  border: 1px solid var(--color-ink-700);
+  border-radius: 0.75rem;
+  background-color: color-mix(in srgb, var(--color-ink-900) 55%, transparent);
+  overflow: hidden;
+}
+
+.prose-tech details > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 0.9rem 1.1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-fog-100);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  transition: background-color 0.2s ease;
+}
+.prose-tech details > summary::-webkit-details-marker {
+  display: none;
+}
+.prose-tech details > summary::before {
+  content: '';
+  width: 0.4rem;
+  height: 0.4rem;
+  border-right: 1.5px solid var(--color-accent-400);
+  border-bottom: 1.5px solid var(--color-accent-400);
+  transform: rotate(-45deg);
+  transition: transform 0.25s ease;
+  flex-shrink: 0;
+}
+.prose-tech details[open] > summary::before {
+  transform: rotate(45deg);
+}
+.prose-tech details > summary:hover {
+  background-color: color-mix(in srgb, var(--color-accent-500) 7%, transparent);
+}
+
+/* 展开后的内容区：左侧一条细线，表示这是附属内容 */
+.prose-tech details > *:not(summary) {
+  margin-inline: 1.1rem;
+}
+.prose-tech details > *:not(summary):last-child {
+  margin-bottom: 1rem;
+}
+.prose-tech details > h2,
+.prose-tech details > h3 {
+  margin-top: 1rem;
+  border-bottom: none;
+  padding-bottom: 0;
+  font-size: 1rem;
+}
+
 /* ══════════════════════════════════════════════════════════════
    项目详情页正文排版（Markdown 渲染出来的内容）
    ══════════════════════════════════════════════════════════════ */

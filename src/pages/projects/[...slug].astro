@@ -6,6 +6,7 @@
 import { getCollection, render } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import ScreenshotGallery from '../../components/ScreenshotGallery.astro';
+import VerdictCard from '../../components/VerdictCard.astro';
 import { profile } from '../../data/profile';
 
 export async function getStaticPaths() {
@@ -127,6 +128,17 @@ const others = (await getCollection('projects'))
     </div>
   </header>
 
+  <!-- 30 秒看懂：一句话结论 + 要点 + 证据索引 -->
+  {
+    d.verdict && (
+      <VerdictCard
+        headline={d.verdict.headline}
+        points={d.verdict.points}
+        evidence={d.evidence}
+      />
+    )
+  }
+
   <!-- 正文 + 侧边目录 -->
   <div class="wrap py-12 md:py-16">
     <div class="grid gap-12 lg:grid-cols-[minmax(0,1fr)_15rem]">
@@ -211,4 +223,37 @@ const others = (await getCollection('projects'))
       </section>
     )
   }
+
+  <script>
+    /**
+     * 折叠区块的产品逻辑：**不锁内容，只降低打扰**
+     *
+     * 折叠块默认收起是为了减少首屏的视觉负担，但内容必须随时可达 ——
+     * 所以这里做一件事：当访问者通过目录锚点跳到某个折叠块，或直接访问
+     * 带锚点的 URL 时，自动把目标块展开，不需要他再点一次。
+     */
+    const openTargetDetails = () => {
+      const hash = window.location.hash;
+      if (!hash) return;
+
+      let el;
+      try {
+        el = document.querySelector(hash);
+      } catch {
+        return; // 非法选择器，忽略
+      }
+      if (!el) return;
+
+      // 目标本身是 details，或者它在某个 details 内部
+      const details = el.closest('details');
+      if (details) {
+        details.open = true;
+        // 展开后内容位置会变，把目标重新对到视口
+        window.requestAnimationFrame(() => el.scrollIntoView({ block: 'start' }));
+      }
+    };
+
+    openTargetDetails();
+    window.addEventListener('hashchange', openTargetDetails);
+  </script>
 </BaseLayout>

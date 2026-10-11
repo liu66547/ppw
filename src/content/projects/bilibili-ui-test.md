@@ -25,6 +25,21 @@ links:
   - label: GitHub
     href: https://github.com/liu66547
     icon: github
+verdict:
+  headline: 不是"会写 Selenium"，而是把 UI 用例做到页面改版不用重写。
+  points:
+    - 基于 Page Object 分层，BasePage 统一封装定位与显式等待，<strong>用例与页面元素彻底解耦</strong>
+    - 针对动态渲染与登录风控，采用「显式等待 + CSS 优先、XPath 兜底」策略，<strong>消除元素未就绪导致的偶发失败</strong>
+    - 覆盖首页加载、关键词搜索（阳性/阴性双侧）、结果页跳转、新窗口句柄切换等核心用例，全量通过率 100%
+    - 失败自动截图接入 Allure 报告，<strong>保留失败现场</strong>，缩短定位路径
+evidence:
+  - label: 框架设计说明
+    detail: 本页下方「架构设计」一节，含 BasePage 职责划分
+  - label: 稳定性策略
+    detail: 定位策略与等待机制的选择理由，见「架构设计」关键设计部分
+  - label: 源码
+    href: https://github.com/liu66547
+    detail: 项目仍在优化中，截图与报告待补充
 ---
 
 ## 项目背景
