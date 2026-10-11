@@ -2,10 +2,15 @@
 /**
  * 首屏 Hero —— 个人资料页的门面
  *
- * 设计要点：
- * - 不放"正在寻找 xx 岗位"这类时效性文案（简历会换版本，网站长期复用）
- * - 联系方式从"一排小图标"改为"带文字标注的按钮" —— 图标没人认得出是 GitHub 还是 Gitee
- * - 入场动画用纯 CSS（.hero-in），不依赖 JS，保证首屏一定可见
+ * 排版层级（从大到小、从亮到暗）：
+ *   姓名（渐变大字） → 身份（标题级） → 信息行（等宽小字） →
+ *   一句话主张 → 自我介绍 → 联系方式
+ *
+ * 视觉细节：
+ *   - 姓名用渐变文字，字号与字重拉到最大，是整页唯一的"主角"
+ *   - 姓名与身份之间用一条极细的渐变线分隔，制造停顿感
+ *   - 信息行用等宽字体 + 分隔点，像数据标签而不是句子
+ *   - 入场动画用纯 CSS（.hero-in），不依赖 JS，保证首屏一定可见
  */
 import { profile } from '../data/profile';
 
@@ -38,18 +43,36 @@ const contacts = [
   <!-- 背景：点阵纹理，向四周淡出 -->
   <div class="pointer-events-none absolute inset-0 bg-dots mask-fade" aria-hidden="true"></div>
 
-  <div class="wrap relative py-20 md:py-24">
+  <div class="wrap relative py-20 md:py-28">
     <div class="max-w-3xl">
-      <h1 class="hero-in text-4xl font-bold leading-[1.1] tracking-tight sm:text-5xl md:text-6xl">
+      <h1 class="hero-in text-[2.75rem] font-bold leading-[1.05] tracking-[-0.03em] sm:text-6xl md:text-[4.25rem]">
         <span class="text-gradient">{profile.name}</span>
-        <span class="mt-2 block text-2xl font-semibold text-fog-400 sm:text-3xl md:text-4xl">
-          {profile.title}
-        </span>
       </h1>
 
-      <!-- 身份信息行：只放访客真正关心的事实（所在地已移到页脚） -->
-      <p class="hero-in mono mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-fog-500">
-        <span class="inline-flex items-center gap-1.5">
+      <!-- 渐变分隔线：在姓名与身份之间制造一个停顿 -->
+      <div
+        class="hero-in mt-5 flex items-center gap-4"
+        style="animation-delay: 0.16s"
+        aria-hidden="true"
+      >
+        <span
+          class="h-px w-14 bg-gradient-to-r from-accent-400/80 to-transparent"
+        ></span>
+      </div>
+
+      <p
+        class="hero-in mt-4 text-xl font-semibold tracking-tight text-fog-200 sm:text-2xl md:text-3xl"
+        style="animation-delay: 0.2s"
+      >
+        {profile.title}
+      </p>
+
+      <!-- 身份信息行：用等宽字体 + 分隔点，像数据标签而不是句子 -->
+      <div
+        class="hero-in mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 text-[13px]"
+        style="animation-delay: 0.26s"
+      >
+        <span class="mono inline-flex items-center gap-1.5 text-fog-400">
           <svg class="size-3.5 text-accent-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
             <path d="M6 12v5c3 3 9 3 12 0v-5" />
@@ -57,25 +80,31 @@ const contacts = [
           {profile.education.school} · {profile.education.degree}
         </span>
         <span class="text-ink-600" aria-hidden="true">/</span>
-        <span>{profile.education.range}</span>
+        <span class="mono text-fog-400">{profile.education.range}</span>
         <span class="text-ink-600" aria-hidden="true">/</span>
-        <span>{profile.education.note}</span>
-      </p>
+        <span class="mono text-fog-500">{profile.education.note}</span>
+      </div>
 
-      <p class="hero-in mt-7 max-w-2xl text-base leading-relaxed text-fog-200 sm:text-lg">
+      <p
+        class="hero-in mt-8 max-w-2xl text-base leading-relaxed text-fog-100 sm:text-[1.0625rem]"
+        style="animation-delay: 0.32s"
+      >
         {profile.tagline}
       </p>
 
-      <p class="hero-in mt-4 max-w-2xl text-sm leading-relaxed text-fog-400">
+      <p
+        class="hero-in mt-3.5 max-w-2xl text-sm leading-[1.9] text-fog-400"
+        style="animation-delay: 0.38s"
+      >
         {profile.intro}
       </p>
     </div>
 
     <!-- 联系方式：明确标注每个是什么，不再是几个认不出的图标 -->
-    <div class="hero-in mt-10">
+    <div class="hero-in mt-11" style="animation-delay: 0.46s">
       <p class="mono text-[11px] uppercase tracking-[0.16em] text-fog-500">联系方式</p>
 
-      <ul class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <ul class="mt-3.5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {
           contacts.map((c) => (
             <li>
@@ -83,7 +112,7 @@ const contacts = [
                 href={c.href}
                 target={c.external ? '_blank' : undefined}
                 rel={c.external ? 'noopener noreferrer' : undefined}
-                class="card group flex items-center gap-3.5 p-4"
+                class="card card-hoverable group flex items-center gap-3.5 p-4"
               >
                 <span
                   class:list={[
@@ -146,7 +175,7 @@ const contacts = [
         }
       </ul>
 
-      <div class="mt-5 flex flex-wrap items-center gap-3">
+      <div class="mt-6 flex flex-wrap items-center gap-3">
         <a href="#projects" class="btn btn-primary">
           查看项目
           <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
