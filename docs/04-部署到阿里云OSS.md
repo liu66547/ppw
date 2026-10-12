@@ -40,15 +40,68 @@ OSS 控制台 → 进入 `hk-len-ppw` → 左侧 **数据管理** → **静态�
 
 ## 三、Step 2：上传文件
 
-### 准备 AccessKey（安全做法）
+**不需要安装任何工具。** OSS 控制台自带上传功能，
+而且[官方文档](https://www.alibabacloud.com/help/zh/oss/how-to-upload-directories-to-and-download-directories-from-oss)明确说明：
+**上传时直接把文件夹拖拽到上传区域，会保留文件夹结构。**
 
-**不要用主账号的 AccessKey。** 建一个只能访问这个 Bucket 的子账号：
+### 操作步骤
+
+1. 进入 `hk-len-ppw` → 左侧 **文件管理** → **文件列表**
+2. 点 **上传文件**，弹出上传面板
+3. **先解压 `oss-upload.zip`**，然后按下面拖进去：
+
+   | 内容 | 怎么传 |
+   | --- | --- |
+   | `index.html` / `404.html` / `favicon.svg` / `robots.txt` / `sitemap.xml` / `resume.pdf` | 全选后直接拖进上传区域 |
+   | `_astro` 文件夹 | **直接拖进去**（结构会保留） |
+   | `projects` 文件夹 | **直接拖进去** |
+
+4. 点 **上传文件**，等待完成
+
+> ⚠️ **最关键的一点**：`index.html` 必须在 Bucket **根目录**下。
+>
+> 如果你把整个 `dist` 文件夹拖进去了，Bucket 里会多出 `dist/` 这一层。
+> 处理办法：进去把里面的内容全选 → 用「复制」或「移动」放到根目录 → 删掉空的 `dist`。
+
+### 上传后的结构应该是
+
+```
+hk-len-ppw/
+├── index.html              ← 必须在这一层
+├── 404.html
+├── favicon.svg
+├── robots.txt
+├── sitemap.xml
+├── resume.pdf
+├── _astro/                 ← CSS 与字体
+│   ├── index.xxx.css
+│   └── *.woff2
+└── projects/
+    ├── allure-report.jpg
+    ├── allure-behaviors.jpg
+    ├── jenkins-dashboard.jpg
+    ├── jenkins-email-alerts.png
+    ├── project-structure.jpg
+    ├── xzs-api-test/index.html
+    └── bilibili-ui-test/index.html
+```
+
+### 关于 AccessKey —— 现在不需要
+
+**控制台上传用的是你的登录态，不需要 AccessKey。**
+
+只有以后想用命令行工具（ossutil）做自动化部署时才需要。那时再按最小权限原则创建：
+
+<details>
+<summary>可选：创建最小权限的 RAM 子账号（仅 ossutil 自动化部署时需要）</summary>
+
+**不要用主账号的 AccessKey。**
 
 1. 打开 https://ram.console.aliyun.com/users → **创建用户**
 2. 登录名填 `oss-uploader`，勾选 **OpenAPI 调用访问**
 3. 创建后**立刻保存 AccessKey ID 和 Secret**（只显示一次）
 4. 回到用户列表 → 点该用户 → **权限管理** → 新增授权
-   - 选择 **自定义策略** → 新建策略，粘贴下面的内容（把 Bucket 名换成你的）：
+   - 选择 **自定义策略** → 新建策略，粘贴下面的内容（Bucket 名按实际改）：
 
 ```json
 {
@@ -67,32 +120,13 @@ OSS 控制台 → 进入 `hk-len-ppw` → 左侧 **数据管理** → **静态�
 ```
 
 > 这个策略只允许上传和读取，**即使密钥泄露也无法删库**。
+>
+> 之后可以用 ossutil 一条命令全量覆盖上传：
+> ```bash
+> ossutil cp -r dist/ oss://hk-len-ppw/ --update
+> ```
 
-### 上传
-
-下载 [ossbrowser](https://help.aliyun.com/zh/oss/developer-reference/ossbrowser)（图形化工具），
-用上面那对子账号 AccessKey 登录，进入 `hk-len-ppw`，把压缩包解压后的**全部内容**拖进去。
-
-**上传后的目录结构应该是**（注意：不要把 `dist` 这一层传上去）：
-
-```
-hk-len-ppw/
-├── index.html
-├── 404.html
-├── favicon.svg
-├── robots.txt
-├── sitemap.xml
-├── resume.pdf
-├── _astro/                  ← CSS 与字体
-├── projects/
-│   ├── allure-report.jpg
-│   ├── allure-behaviors.jpg
-│   ├── jenkins-dashboard.jpg
-│   ├── jenkins-email-alerts.png
-│   ├── project-structure.jpg
-│   ├── xzs-api-test/index.html
-│   └── bilibili-ui-test/index.html
-```
+</details>
 
 ---
 
@@ -132,7 +166,7 @@ Bucket → 域名管理 → 找到 `len666.top` → **证书托管** / **开启 
 3. 部署完成后，建议开启 **强制 HTTPS 跳转**
 
 > 顺便处理之前看到的「允许的 TLS 版本：未设置，全部允许」——
-> 在域名管理或 Bucket 配置里把 TLS 最低版本设为 **TLS 1.2**，关掉老旧的 TLS 1.0/1.1。
+> 把 TLS 最低版本设为 **TLS 1.2**，关掉老旧的 TLS 1.0/1.1。
 
 ---
 
@@ -178,35 +212,30 @@ https://*.len666.top
 
 ## 九、以后怎么更新网站
 
-内容改动后重新部署只需三步：
+内容改动后重新部署：
 
 ```bash
-# 1. 本地构建
 cd D:\dsWrokplace\front
 npm run build
-
-# 2. 打包
-#    （或直接把 dist 目录内容拖进 ossbrowser）
-Compress-Archive -Path 'dist\*' -DestinationPath 'oss-upload.zip' -Force
-
-# 3. 用 ossbrowser 上传，覆盖同名文件
 ```
 
-> 💡 只改了文字（`src/data/` 或 `src/content/`）时，也可以只上传变化的文件，
-> 但**全量覆盖最省心** —— 总大小才 1.26 MB，几秒钟的事。
+然后打开 OSS 控制台 → 文件列表 → 上传文件 → **把 `dist` 里的内容拖进去覆盖**。
+
+> 💡 全量覆盖最省心 —— 总共才 1.26 MB，几秒钟的事。
+> 只改了某个文件也可以只传那一个。
 
 ---
 
 ## 十、备案以后怎么办（可选升级）
 
-香港节点已经够用，但如果你想让国内访问**更快**，可以走这条路：
+香港节点已经够用，但如果你想让国内访问**更快**：
 
 1. 备案完成后（需要先买一台国内服务器来申请备案服务码）
 2. 新建一个**内地地域**的 Bucket
 3. 把文件同样上传一份
 4. 把域名从香港 Bucket 解绑，改绑到内地 Bucket
 
-**网站代码、构建产物一行都不用改** —— 只是换了个存储位置。
+**网站代码、构建产物一行都不用改** —— 只是换了存储位置。
 
 > 也可以在香港 Bucket 前面挂阿里云 CDN，但 CDN 加速国内同样要求域名已备案。
 
@@ -218,7 +247,16 @@ Compress-Archive -Path 'dist\*' -DestinationPath 'oss-upload.zip' -Force
 | --- | --- | --- |
 | 访问域名下载文件而不是显示网页 | 域名没开静态网站托管 | 开启静态网站托管并设默认首页 |
 | 首页正常，项目详情页 404 | 「子目录首页」没勾 | 静态页面设置里勾上 |
-| 域名访问返回 XML 错误页 | CNAME 没配或没生效 | `nslookup len666.top` 看解析结果 |
-| 图片/样式加载不出来 | 文件没传全或路径层级错了 | 检查 `_astro/` 目录是否在 Bucket 根下 |
+| 访问显示一串 XML 错误 | CNAME 没配或没生效 | `nslookup len666.top` 看解析结果 |
+| 图片/样式加载不出来 | 文件没传全，或多了 `dist/` 一层 | 确认 `_astro/` 在 Bucket 根目录下 |
 | 提示证书错误 | HTTPS 证书未部署 | 域名管理里申请并部署免费证书 |
-| 改了内容但页面没变 | 浏览器/CDN 缓存 | `Ctrl + F5` 强制刷新 |
+| 改了内容但页面没变 | 浏览器缓存 | `Ctrl + F5` 强制刷新 |
+
+---
+
+## 附：官方文档链接
+
+- [控制台快速入门（创建 Bucket、上传文件）](https://www.alibabacloud.com/help/zh/oss/user-guide/console-quick-start)
+- [怎样上传下载文件夹](https://www.alibabacloud.com/help/zh/oss/how-to-upload-directories-to-and-download-directories-from-oss)
+- [通过自定义域名访问 OSS](https://www.alibabacloud.com/help/zh/oss/user-guide/access-buckets-via-custom-domain-names)
+- [托管静态网站](https://www.alibabacloud.com/help/zh/oss/user-guide/hosting-static-websites)
