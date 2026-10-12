@@ -41,5 +41,9 @@ _tools/*
 # 本地截图验证产物
 _shots/
 
+# OSS 上传用的打包文件（内容就是 dist/，不需要进仓库）
+oss-upload.zip
+*.zip
+
 # Vercel
 .vercel
