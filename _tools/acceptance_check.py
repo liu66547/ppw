@@ -162,12 +162,19 @@ else:
 
 # ── 5. HTML 完整性 ───────────────────────────────────────────
 print('\n=== 5. HTML 完整性 ===')
+
+# 检查模板残留时必须先剥掉 <script> / <style> ——
+# 压缩后的 JS 里会出现 `d=>{d.preventDefault()` 这类代码，直接搜 '{d.' 会误报。
+# （这个误报真的发生过：Astro 把组件脚本内联进 HTML 后，验收脚本报了 4 个假失败。）
+SCRIPT_STYLE_RE = re.compile(r'<(script|style)\b[^>]*>.*?</\1>', re.S | re.I)
+
 for url, path in pages:
     html = read(path)
+    visible = SCRIPT_STYLE_RE.sub(' ', html)
     problems = []
-    # 未解析的模板残留
+    # 未解析的模板残留（只在可见内容里找）
     for pat in ['undefined', '[object Object]', 'NaN', 'Astro.props', '{profile.', '{d.']:
-        if pat in html:
+        if pat in visible:
             problems.append('含残留文本 %r' % pat)
     # 必要结构
     if '<title>' not in html:

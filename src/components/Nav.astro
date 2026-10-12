@@ -58,8 +58,20 @@ const toHref = (href: string) => (isHome ? href.replace('/', '') : href);
       }
     </nav>
 
-    <!-- 右：简历下载 + 移动端菜单 -->
+    <!-- 右：简历预览 + 下载 + 移动端菜单 -->
     <div class="flex items-center gap-2">
+      <button
+        type="button"
+        data-resume-preview
+        class="btn btn-ghost hidden !px-3.5 !py-2 !text-[13px] sm:inline-flex"
+      >
+        <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+        预览简历
+      </button>
+
       <a
         href={profile.contact.resumeFile}
         download
@@ -98,6 +110,13 @@ const toHref = (href: string) => (isHome ? href.replace('/', '') : href);
               </a>
             ))
           }
+          <button
+            type="button"
+            data-resume-preview
+            class="mt-1 block w-full rounded-lg border border-ink-600 px-3 py-2 text-left text-sm text-fog-200 transition-colors hover:border-accent-500 hover:text-accent-300"
+          >
+            在线预览简历
+          </button>
           <a
             href={profile.contact.resumeFile}
             download

@@ -1,0 +1,156 @@
+---
+/**
+ * 简历在线预览弹层（全局挂载一次）
+ *
+ * 设计：
+ *   - 用原生 <dialog>，浏览器自带 Esc 关闭、焦点陷阱与遮罩，比手写弹层可靠
+ *   - 用 <iframe> 内嵌 PDF，走浏览器自带的 PDF 阅读器（Chrome / Edge / Firefox / Safari 都支持）
+ *   - 移动端浏览器多数不支持内嵌 PDF，所以同时给一个「新窗口打开」的兜底出口
+ *   - 任何带 [data-resume-preview] 的按钮都能唤起它，不需要为每个页面单独接线
+ *
+ * 无障碍：
+ *   弹层有 aria-label；关闭按钮有明确文字；iframe 有 title
+ */
+import { profile } from '../data/profile';
+
+const src = profile.contact.resumeFile;
+---
+
+<dialog
+  id="resume-dialog"
+  class="fixed inset-0 m-0 h-screen max-h-none w-screen max-w-none bg-transparent p-0 backdrop:bg-ink-950/92 backdrop:backdrop-blur-sm"
+  aria-label="简历在线预览"
+>
+  <div class="flex h-full flex-col p-3 md:p-6">
+    <!-- 顶部条：标题 + 操作 -->
+    <div class="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
+      <p class="mono text-[11px] uppercase tracking-widest text-fog-500">
+        简历预览 · {profile.name}
+      </p>
+
+      <div class="flex items-center gap-2">
+        <a
+          href={src}
+          download
+          class="btn btn-primary !px-3.5 !py-2 !text-[13px]"
+        >
+          <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          下载 PDF
+        </a>
+
+        <a
+          href={src}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="btn btn-ghost !px-3.5 !py-2 !text-[13px]"
+          title="手机上如果预览显示不了，用这个在新窗口打开"
+        >
+          <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+            <polyline points="15 3 21 3 21 9" />
+            <line x1="10" y1="14" x2="21" y2="3" />
+          </svg>
+          <span class="hidden sm:inline">新窗口打开</span>
+          <span class="sm:hidden">新窗口</span>
+        </a>
+
+        <button
+          type="button"
+          data-resume-close
+          class="btn btn-ghost !px-3.5 !py-2 !text-[13px]"
+          aria-label="关闭简历预览"
+        >
+          <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+          关闭
+        </button>
+      </div>
+    </div>
+
+    <!-- PDF 容器：延迟加载 src，避免每次进页面都下载 269KB 的 PDF -->
+    <div class="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-ink-700 bg-ink-900">
+      <iframe
+        id="resume-frame"
+        data-src={src}
+        title={`${profile.name} 的简历 PDF 预览`}
+        class="size-full"
+      ></iframe>
+
+      <!-- 加载提示：iframe 首次渲染 PDF 需要一点时间 -->
+      <div
+        id="resume-hint"
+        class="pointer-events-none absolute inset-0 grid place-items-center bg-ink-900"
+      >
+        <p class="mono text-xs text-fog-500">正在载入简历…</p>
+      </div>
+    </div>
+
+    <p class="mono mt-2.5 shrink-0 text-center text-[11px] text-fog-500">
+      按 Esc 关闭 · 手机上若无法显示，请点「新窗口打开」
+    </p>
+  </div>
+</dialog>
+
+<script>
+  const dialog = document.getElementById('resume-dialog') as HTMLDialogElement | null;
+  const frame = document.getElementById('resume-frame') as HTMLIFrameElement | null;
+
+  if (dialog && frame) {
+    const placeholder = document.getElementById('resume-hint');
+    // 记下提示层原本的位置，关闭时好把它放回去
+    const hintParent = placeholder?.parentElement ?? null;
+    const hintNext = placeholder?.nextSibling ?? null;
+
+    /** 首次打开时才设置 iframe 的 src —— 否则首页会白白下载一份 PDF */
+    const ensureLoaded = () => {
+      const src = frame.dataset.src;
+      if (!src || frame.getAttribute('src')) return;
+
+      // 把加载提示放回去（上次关闭时可能被移除了）
+      if (placeholder && hintParent && !placeholder.isConnected) {
+        hintParent.insertBefore(placeholder, hintNext);
+      }
+
+      frame.setAttribute('src', src);
+      frame.addEventListener(
+        'load',
+        () => placeholder?.remove(),
+        { once: true },
+      );
+      // 兜底：某些浏览器 iframe 载入 PDF 不触发 load，3 秒后也把提示去掉
+      window.setTimeout(() => placeholder?.remove(), 3000);
+    };
+
+    // 任何带 data-resume-preview 的按钮都能唤起
+    document.querySelectorAll<HTMLElement>('[data-resume-preview]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        ensureLoaded();
+        dialog.showModal();
+      });
+    });
+
+    document.querySelector('[data-resume-close]')?.addEventListener('click', () => {
+      dialog.close();
+    });
+
+    // 点遮罩关闭（dialog 自身区域之外）
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) dialog.close();
+    });
+
+    /**
+     * 关闭时卸掉 iframe 的 src，释放 PDF 渲染占用的内存。
+     * 下次打开会重新走 ensureLoaded（src 为空 → 重新装载）。
+     */
+    dialog.addEventListener('close', () => {
+      frame.removeAttribute('src');
+    });
+  }
+</script>

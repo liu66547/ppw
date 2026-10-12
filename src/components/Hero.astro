@@ -183,6 +183,16 @@ const contacts = [
             <polyline points="12 5 19 12 12 19" />
           </svg>
         </a>
+
+        <!-- 在线预览：不下载就能看，降低招聘方的阅读门槛 -->
+        <button type="button" data-resume-preview class="btn btn-ghost">
+          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          在线预览简历
+        </button>
+
         <a href={profile.contact.resumeFile} download class="btn btn-ghost">
           <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />

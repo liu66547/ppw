@@ -77,12 +77,14 @@ for (const s of screenshots) {
         </div>
       ))}
 
-      {/* 放大层 */}
+      {/* 放大层
+          注意：<dialog> 默认是 width: fit-content，必须显式给 w-screen，
+          否则弹层只按内容宽度撑开，大图会被挤在左侧窄条里。 */}
       <dialog
         id="lightbox"
-        class="m-0 max-h-none max-w-none bg-transparent p-0 backdrop:bg-ink-950/92 backdrop:backdrop-blur-sm"
+        class="fixed inset-0 m-0 h-screen max-h-none w-screen max-w-none bg-transparent p-0 backdrop:bg-ink-950/92 backdrop:backdrop-blur-sm"
       >
-        <div class="grid min-h-screen place-items-center p-4 md:p-8">
+        <div class="grid h-full place-items-center overflow-auto p-4 md:p-8">
           <div class="relative w-full max-w-6xl">
             <button
               type="button"

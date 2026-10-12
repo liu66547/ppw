@@ -53,8 +53,14 @@ export const profile = {
     githubHandle: 'liu66547',
     gitee: 'https://gitee.com/liu66547',
     giteeHandle: 'liu66547',
-    /** 简历 PDF 放在 public/ 目录下，这里写文件名即可 */
-    resumeFile: '/刘德啉-自动化测试-简历.pdf',
+    /**
+     * 简历 PDF。
+     *
+     * 文件名故意用 ASCII 的 resume.pdf —— 中文文件名在 URL 里要编码，
+     * 部分浏览器和 CDN 处理不一致，可能出现「点了下载没反应」。
+     * 换简历时把新 PDF 重命名成 resume.pdf 覆盖 public/ 里那个即可，不用改代码。
+     */
+    resumeFile: '/resume.pdf',
   },
 
   /** 教育背景 */

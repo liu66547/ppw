@@ -5,6 +5,7 @@
 import '../styles/global.css';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
+import ResumePreview from '../components/ResumePreview.astro';
 import { site } from '../data/profile';
 
 interface Props {
@@ -78,6 +79,9 @@ const isHome = Astro.url.pathname === '/';
     </main>
 
     <Footer />
+
+    <!-- 简历在线预览弹层：全局挂载一次，任何带 data-resume-preview 的按钮都能唤起 -->
+    <ResumePreview />
 
     <script>
       // 滚动入场动画：元素进入视口时淡入
