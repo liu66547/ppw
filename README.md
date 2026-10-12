@@ -1,14 +1,12 @@
-# 个人求职网站 · 刘德啉
+# 个人网站 · 刘德啉
 
 2027 届自动化测试工程师的个人网站。展示接口自动化测试与 UI 自动化测试项目的
 架构设计、测试方法论与缺陷发现证据链。
 
+**线上地址**：https://len666.top
 **技术栈**：Astro 5 + TypeScript + Tailwind CSS 4 → 输出纯静态站点
 
-> 💡 下面这个徽章要等你推到 GitHub 后才显示。记得把 URL 里的
-> `你的用户名` 换成你自己的 GitHub 用户名。
-
-[![构建与验收](https://github.com/你的用户名/portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/你的用户名/portfolio/actions/workflows/ci.yml)
+[![构建与验收](https://github.com/liu66547/portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/liu66547/portfolio/actions/workflows/ci.yml)
 
 ---
 
