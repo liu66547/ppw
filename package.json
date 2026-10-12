@@ -3,7 +3,7 @@
   "type": "module",
   "version": "1.0.0",
   "private": true,
-  "description": "刘德啉 · 自动化测试工程师 · 个人求职网站",
+  "description": "刘德啉 · 自动化测试工程师 · 个人网站",
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
@@ -26,6 +26,7 @@
     "node": ">=20.3.0"
   },
   "comments": {
+    "engines": "只声明最低版本，不要写精确版本 —— Vercel 构建时会读这个字段，写太严会被判为不满足而警告。实际使用版本由 .nvmrc 与 Vercel 项目的 Node.js Version 决定。",
     "overrides": "Astro 5 依赖 vite 6，Tailwind 插件同时兼容 vite 5/6/7/8。若不锁定，npm 会把 vite 8 提升到根目录、再给 Astro 嵌套一份 vite 6，导致两套 Vite 并存、类型冲突。"
   },
   "overrides": {

@@ -6,7 +6,7 @@
 **线上地址**：https://len666.top
 **技术栈**：Astro 5 + TypeScript + Tailwind CSS 4 → 输出纯静态站点
 
-[![构建与验收](https://github.com/liu66547/portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/liu66547/portfolio/actions/workflows/ci.yml)
+[![构建与验收](https://github.com/liu66547/ppw/actions/workflows/ci.yml/badge.svg)](https://github.com/liu66547/ppw/actions/workflows/ci.yml)
 
 ---
 
