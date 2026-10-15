@@ -152,23 +152,31 @@ const ACTS = [
     inset: 0;
     z-index: 0;
     pointer-events: none;
+    /* 强度由 JS 每帧写入 —— 它随滚动进度减弱。
+       为什么必须动态：这层是为【首幕太阳近景】调的强度（那时画面里
+       有一个占满右侧的巨大亮源，必须压住才能读字）。但同一强度压到
+       页脚就过暗了（实测页脚平均亮度仅 11，而首幕 16.6，明显发闷）。
+
+       实测依据：把这一层关掉后页脚亮度从 11.1 回到 17.4，而画布本身
+       （星空 + 行星）亮度是足够的 —— 说明问题在这层的固定强度，
+       不在 3D 场景。 */
+    opacity: var(--ds-scrim-opacity, 1);
     background:
-      /* 中部暗化：正文满宽，天体会从中间掠过，这一层是文字可读性的主力。
-         强度经实测调整 —— 0.42 时太阳的亮面仍会透过玻璃卡片压住文字
-         （用户反馈"看得太杂"），提到 0.62 后文字才真正干净。
-         衰减走三段，避免出现肉眼可见的"圆盘边界"。 */
+      /* 中部暗化：正文满宽，天体会从中间掠过，这一层是文字可读性的主力 */
       radial-gradient(
         ellipse 96% 82% at 50% 52%,
-        rgba(3, 6, 12, 0.62) 0%,
-        rgba(3, 6, 12, 0.55) 42%,
-        rgba(3, 6, 12, 0.30) 68%,
+        rgba(3, 6, 12, 0.60) 0%,
+        rgba(3, 6, 12, 0.52) 42%,
+        rgba(3, 6, 12, 0.26) 68%,
         rgba(3, 6, 12, 0) 88%
       ),
-      /* 四周暗角：把视觉焦点收拢到中间 */
+      /* 四周暗角：收拢视觉焦点。
+         强度从 0.40 降到 0.24 —— 页脚正好落在暗角最重的区域，
+         0.40 时把整块内容压得发闷。 */
       radial-gradient(
         ellipse 122% 112% at 50% 50%,
-        rgba(0, 0, 0, 0) 48%,
-        rgba(0, 0, 0, 0.40) 100%
+        rgba(0, 0, 0, 0) 52%,
+        rgba(0, 0, 0, 0.24) 100%
       );
   }
 
@@ -279,11 +287,15 @@ const ACTS = [
       canvasHost.className = 'ds-canvas';
       document.body.appendChild(canvasHost);
 
-      // 阅读罩：叠在画布之上、正文之下，只压暗首屏左上角，
-      // 保证太阳在右侧明亮的同时，左侧正文始终清晰可读。
+      // 阅读罩：叠在画布之上、正文之下，压暗正文区域，保证文字清晰可读。
+      // 强度随滚动进度动态减弱 —— 首幕有一个占满右侧的巨大亮源需要压住，
+      // 但同一个强度压到页脚就太闷了（实测依据见样式里的注释）。
       const scrim = document.createElement('div');
       scrim.className = 'ds-scrim';
       document.body.appendChild(scrim);
+
+      /** 滚动进度 -> 阅读罩强度。1.0 是首幕所需强度，到结尾降到 0.55。 */
+      const scrimOpacityFor = (p: number) => 1 - 0.45 * Math.min(1, Math.max(0, p));
 
       // 注：body 的 .ds-3d-page 类在外层已无条件加过，这里不用重复
 
@@ -662,8 +674,8 @@ const ACTS = [
           { r: 12500, a: 4.35, c: 0x8a4bd4, s: 11000, o: 0.09, tex: 0 }, // 紫罗兰
           { r: 14500, a: 5.85, c: 0x2f6fd0, s: 13500, o: 0.09, tex: 1 }, // 靛蓝
           { r: 16500, a: 0.95, c: 0xe0a63c, s: 12000, o: 0.07, tex: 0 }, // 琥珀
-          { r: 19000, a: 3.25, c: 0xbe4a5e, s: 15000, o: 0.065, tex: 1 }, // 玫瑰红
-          { r: 22000, a: 5.05, c: 0x3ab0a8, s: 17000, o: 0.06, tex: 1 }, // 湖蓝绿
+          { r: 19000, a: 3.25, c: 0xbe4a5e, s: 15000, o: 0.085, tex: 1 }, // 玫瑰红
+          { r: 22000, a: 5.05, c: 0x3ab0a8, s: 17000, o: 0.08, tex: 1 }, // 湖蓝绿
         ];
         defs.forEach((d, i) => {
           const sp = new THREE.Sprite(
@@ -1572,6 +1584,14 @@ const ACTS = [
         dustField.rotation.y = elapsed * 0.0026;
         // 微光点缀层缓慢反向自转，与星场形成微小视差
         sparkleField.rotation.y = -elapsed * 0.0022;
+
+        /* 阅读罩强度跟随滚动减弱。
+           早先用固定强度，结果首幕合适、页脚过暗（实测页脚平均亮度仅 11）。
+           只写 CSS 变量，不触发重排，开销可忽略。 */
+        scrim.style.setProperty(
+          '--ds-scrim-opacity',
+          scrimOpacityFor(progress).toFixed(3),
+        );
 
         /* 背景亮度随进度略降：越到后面越暗，保证正文可读 */
         sunUniforms.uBrightness.value = 0.86 - p * 0.16;

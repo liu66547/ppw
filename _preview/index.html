@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>部署前预览 · len666.top</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2rem clamp(1rem, 4vw, 3rem) 4rem;
+    background: radial-gradient(ellipse 120% 80% at 50% 0%, #0a1220 0%, #04060c 60%, #010204 100%);
+    color: #e6eefb; min-height: 100vh;
+    font: 15px/1.6 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  }
+  h1 { font-size: clamp(1.4rem, 3vw, 2rem); margin: 0 0 .4rem; letter-spacing: -.01em; }
+  h2 { font-size: 1.15rem; margin: 0 0 1rem; color: #8fd8ff;
+       padding-bottom: .5rem; border-bottom: 1px solid rgba(120,160,220,.18); }
+  .lead { color: #93a4bd; margin: 0 0 2.5rem; max-width: 78ch; }
+  .lead code { background: rgba(120,160,220,.14); padding: .1em .4em; border-radius: 4px;
+               color: #b8d8ff; font-size: .92em; }
+  section { margin-bottom: 3.5rem; }
+  .grid { display: grid; gap: 1.75rem;
+          grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--cols)), 1fr)); }
+  .shot { margin: 0; border: 1px solid rgba(120,160,220,.16); border-radius: 12px;
+          overflow: hidden; background: rgba(10,16,28,.6); }
+  figcaption { display: flex; align-items: center; gap: .6rem; padding: .55rem .8rem;
+               font-size: .78rem; background: rgba(16,26,42,.85);
+               border-bottom: 1px solid rgba(120,160,220,.12); }
+  .pct { background: rgba(64,200,220,.16); color: #6fe3f0; padding: .1em .5em;
+         border-radius: 999px; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .name { color: #b9c8dd; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
+  .scroll { margin-left: auto; color: #61728c; font-variant-numeric: tabular-nums; }
+  .shot img { display: block; width: 100%; height: auto;
+              border-top: 1px solid rgba(0,0,0,.4); }
+  .note { margin: 0; padding: .7rem .85rem; font-size: .82rem; color: #93a4bd;
+          background: rgba(8,12,22,.7); border-top: 1px solid rgba(120,160,220,.1); }
+  .hint { background: rgba(20,40,64,.5); border: 1px solid rgba(100,180,240,.25);
+          border-radius: 10px; padding: 1rem 1.2rem; margin-bottom: 2rem; font-size: .9rem; }
+  .hint b { color: #8fd8ff; }
+  .hint ul { margin: .6rem 0 0; padding-left: 1.2rem; }
+  .hint li { margin: .25rem 0; }
+</style>
+</head>
+<body>
+  <h1>部署前预览 · len666.top</h1>
+  <p class="lead">
+    来源：<code>http://127.0.0.1:4180/</code>（本地最新构建，与待上传的 <code>oss-upload.zip</code> 完全一致）。
+    桌面端 1440×900 抓 14 个滚动位置，移动端 390×844 抓 6 个。
+  </p>
+
+  <div class="hint">
+    <b>看这几点就够了</b>
+    <ul>
+      <li><b>0% → 100%</b>：整个页面的背景就是 3D 太阳系，滚动驱动镜头从太阳近景推到全景</li>
+      <li><b>太阳</b>：暖金渐变 + 米粒组织 + 黑子 + 柔和边缘辉光</li>
+      <li><b>地球</b>：真实贴图，能看到海陆轮廓与云层</li>
+      <li><b>星空</b>：五彩尘埃云 + 带十字星芒的微光点缀</li>
+      <li><b>文字</b>：始终清晰，3D 只当背景，不与正文争抢</li>
+      <li><b>移动端</b>：无横向滚动条，卡片单列铺满</li>
+    </ul>
+  </div>
+
+  
+  <section>
+    <h2>桌面端 · 滚动全程（1440×900）</h2>
+    <div class="grid" style="--cols:440px">
+    <figure class="shot">
+      <figcaption>
+        <span class="pct">0%</span>
+        <span class="name">desktop-01.png</span>
+        <span class="scroll">scrollY 0</span>
+      </figcaption>
+      <img src="desktop-01.png" alt="desktop-01.png" loading="lazy" />
+      <p class="note">第一幕 · 太阳近景 —— 太阳在右侧，米粒组织与黑子可见，彗星从左侧飞过</p>
+    </figure>
+    <figure class="shot">
+      <figcaption>
+        <span class="pct">8%</span>
+        <span class="name">desktop-02.png</span>
+        <span class="scroll">scrollY 398</span>
+      </figcaption>
+      <img src="desktop-02.png" alt="desktop-02.png" loading="lazy" />
+      <p class="note">第一幕 · 开场文案完整呈现，远景有土星与轨道线</p>
+    </figure>
+    <figure class="shot">
+      <figcaption>
+        <span class="pct">15%</span>
+        <span class="name">desktop-03.png</span>
+        <span class="scroll">scrollY 797</span>
+      </figcaption>
+      <img src="desktop-03.png" alt="desktop-03.png" loading="lazy" />
+      <p class="note">彗星开始向外飞行，太阳逐渐远离</p>
+    </figure>
+    <figure class="shot">
+      <figcaption>
+        <span class="pct">23%</span>
+        <span class="name">desktop-04.png</span>
+        <span class="scroll">scrollY 1195</span>
+      </figcaption>
+      <img src="desktop-04.png" alt="desktop-04.png" loading="lazy" />
+      <p class="note">第二幕 · 视角转向地球，地球（NASA 实拍贴图）进入右侧画面</p>
+    </figure>
+    <figure class="shot">
+      <figcaption>
+        <span class="pct">31%</span>
+        <span class="name">desktop-05.png</span>
+        <span class="scroll">scrollY 1594</span>
+      </figcaption>
+      <img src="desktop-05.png" alt="desktop-05.png" loading="lazy" />
+      <p class="note">第二幕 · 地球与太阳同框，云层与海陆轮廓清晰</p>
+    </figure>
+    <figure class="shot">
+      <figcaption>
+        <span class="pct">38%</span>
+        <span class="name">desktop-06.png</span>
+        <span class="scroll">scrollY 1992</span>
+      </figcaption>
+      <img src="desktop-06.png" alt="desktop-06.png" loading="lazy" />
+      <p class="note">第二幕 · 地球继续右移，月球作为小天体伴随</p>
+    </figure>
+    <figure class="shot">
+      <figcaption>
+        <span class="pct">46%</span>
+        <span class="name">desktop-07.png</span>
+        <span class="scroll">scrollY 2391</span>
+      </figcaption>
+      <img src="desktop-07.png" alt="desktop-07.png" loading="lazy" />
+      <p class="note">技能板块 · 玻璃拟态卡片（数据库与缓存 / 编程语言）</p>
+    </figure>
+    <figure class="shot">
+      <figcaption>
+        <span class="pct">54%</span>
+        <span class="name">desktop-08.png</span>
+        <span class="scroll">scrollY 2789</span>
+      </figcaption>
+      <img src="desktop-08.png" alt="desktop-08.png" loading="lazy" />
+      <p class="note">技能板块 · 玻璃卡片悬停态与背景天体互不干扰</p>
+    </figure>
+    <figure class="shot">
+      <figcaption>
+        <span class="pct">62%</span>
+        <span class="name">desktop-09.png</span>
+        <span class="scroll">scrollY 3188</span>
+      </figcaption>
+      <img src="desktop-09.png" alt="desktop-09.png" loading="lazy" />
+      <p class="note">技能板块 · 测试工具 / 后端与网络</p>
+    </figure>
+    <figure class="shot">
+      <figcaption>
+        <span class="pct">69%</span>
+        <span class="name">desktop-10.png</span>
+        <span class="scroll">scrollY 3586</span>
+      </figcaption>
+      <img src="desktop-10.png" alt="desktop-10.png" loading="lazy" />
+      <p class="note">技能板块 · 测试设计与流程，背景已是深空星野</p>
+    </figure>
+    <figure class="shot">
+      <figcaption>
+        <span class="pct">77%</span>
+        <span class="name">desktop-11.png</span>
+        <span class="scroll">scrollY 3985</span>
+      </figcaption>
+      <img src="desktop-11.png" alt="desktop-11.png" loading="lazy" />
+      <p class="note">核心优势板块 · 卡片在星野之上，文字清晰</p>
+    </figure>
+    <figure class="shot">
+      <figcaption>
+        <span class="pct">85%</span>
+        <span class="name">desktop-12.png</span>
+        <span class="scroll">scrollY 4383</span>
+      </figcaption>
+      <img src="desktop-12.png" alt="desktop-12.png" loading="lazy" />
+      <p class="note">项目板块 · 项目卡片与截图</p>
+    </figure>
+    <figure class="shot">
+      <figcaption>
+        <span class="pct">92%</span>
+        <span class="name">desktop-13.png</span>
+        <span class="scroll">scrollY 4782</span>
+      </figcaption>
+      <img src="desktop-13.png" alt="desktop-13.png" loading="lazy" />
+      <p class="note">项目板块 · 第二组项目卡</p>
+    </figure>
+    <figure class="shot">
+      <figcaption>
+        <span class="pct">100%</span>
+        <span class="name">desktop-14.png</span>
+        <span class="scroll">scrollY 5180</span>
+      </figcaption>
+      <img src="desktop-14.png" alt="desktop-14.png" loading="lazy" />
+      <p class="note">第三幕 · 页面底部：联系方式 + 倾斜的太阳系全景，彗星成为远处小点</p>
+    </figure></div>
+  </section>
+  
+  <section>
+    <h2>移动端 · 滚动全程（390×844）</h2>
+    <div class="grid" style="--cols:300px">
+    <figure class="shot">
+      <figcaption>
+        <span class="pct">0%</span>
+        <span class="name">mobile-01.png</span>
+        <span class="scroll">scrollY 0</span>
+      </figcaption>
+      <img src="mobile-01.png" alt="mobile-01.png" loading="lazy" />
+      <p class="note">移动端 · 首屏（无横向滚动条）</p>
+    </figure>
+    <figure class="shot">
+      <figcaption>
+        <span class="pct">20%</span>
+        <span class="name">mobile-02.png</span>
+        <span class="scroll">scrollY 1675</span>
+      </figcaption>
+      <img src="mobile-02.png" alt="mobile-02.png" loading="lazy" />
+      <p class="note">移动端 · 技能卡片单列铺满</p>
+    </figure>
+    <figure class="shot">
+      <figcaption>
+        <span class="pct">40%</span>
+        <span class="name">mobile-03.png</span>
+        <span class="scroll">scrollY 3350</span>
+      </figcaption>
+      <img src="mobile-03.png" alt="mobile-03.png" loading="lazy" />
+      <p class="note">移动端 · 玻璃卡片在窄屏下依然有底色遮罩</p>
+    </figure>
+    <figure class="shot">
+      <figcaption>
+        <span class="pct">60%</span>
+        <span class="name">mobile-04.png</span>
+        <span class="scroll">scrollY 5026</span>
+      </figcaption>
+      <img src="mobile-04.png" alt="mobile-04.png" loading="lazy" />
+      <p class="note">移动端 · 优势板块</p>
+    </figure>
+    <figure class="shot">
+      <figcaption>
+        <span class="pct">80%</span>
+        <span class="name">mobile-05.png</span>
+        <span class="scroll">scrollY 6701</span>
+      </figcaption>
+      <img src="mobile-05.png" alt="mobile-05.png" loading="lazy" />
+      <p class="note">移动端 · 项目板块</p>
+    </figure>
+    <figure class="shot">
+      <figcaption>
+        <span class="pct">100%</span>
+        <span class="name">mobile-06.png</span>
+        <span class="scroll">scrollY 8376</span>
+      </figcaption>
+      <img src="mobile-06.png" alt="mobile-06.png" loading="lazy" />
+      <p class="note">移动端 · 页脚与联系方式</p>
+    </figure></div>
+  </section>
+</body>
+</html>
