@@ -180,6 +180,19 @@ const ACTS = [
    */
   import type * as THREE from 'three';
 
+  /* ── 真实行星贴图 ─────────────────────────────────────────
+     来源：Solar System Scope（solarsystemscope.com/textures）
+     基于 NASA 高程与影像数据，CC BY 4.0 授权，可商用。
+     地球日面图是关键 —— 程序化噪声只能生成"看起来合理"的假大陆，
+     不可能长出真实的非洲大陆与马达加斯加。
+
+     Astro 会在构建时把这些图处理成带哈希的静态资源，
+     所以下面 import 得到的是最终 URL 字符串。 */
+  import earthDayUrl from '../assets/textures/earth_day.jpg';
+  import earthCloudsUrl from '../assets/textures/earth_clouds.jpg';
+  import earthLightsUrl from '../assets/textures/earth_lights.png';
+  import moonMapUrl from '../assets/textures/moon.jpg';
+
   const host = document.getElementById('ds-bg');
 
   if (host) {
@@ -579,18 +592,36 @@ const ACTS = [
       scene.add(dustField);
 
       /* ══════════════════════════════════════════════════════
-         6. 太阳 —— 程序化着色器
-         解决旧版「纯色球 + 低模感」：
-           · 3D fbm 米粒组织 + 随时间对流的大尺度明暗流动
-           · 菲涅尔边缘加亮形成日冕过渡，天然消除多边形轮廓
-           · 色温分层：核心白热 → 金黄 → 边缘深橙红
-           · 临边昏暗（limb darkening）
+         6. 太阳 —— 贴图管表面，几何管日冕
+
+         为什么这样分工：
+           · 表面细节（米粒组织、亮斑）用真实观测贴图最像
+           · 参考图那种"丝状喷流"是日冕结构，贴图很难表达，
+             改用「多层壳体 + 辐条 + 羽流噪声」在几何上做
          ══════════════════════════════════════════════════════ */
       const SUN_R = 420;
 
+      /** 一次性创建贴图，供太阳与行星复用。
+       *
+       *  注意：Astro 5 里 `import img from './x.jpg'` 得到的是
+       *  ImageMetadata 对象（{ src, width, height, format }），不是字符串。
+       *  构建时会输出成带哈希的静态资源，取 .src 才是最终 URL。
+       *  这里兼容两种形态，避免以后升级 Astro 又要改。 */
+      function loadTex(
+        source: string | { src: string },
+        srgb = true,
+      ): THREE.Texture {
+        const url = typeof source === 'string' ? source : source.src;
+        const t = new THREE.TextureLoader().load(url);
+        if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+        t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        t.wrapS = THREE.RepeatWrapping;
+        return t;
+      }
+
       const sunUniforms = {
         uTime: { value: 0 },
-        uBrightness: { value: 0.86 },
+        uBrightness: { value: 0.82 },
       };
 
       const sunCore = new THREE.Mesh(
@@ -620,58 +651,55 @@ const ACTS = [
 
             ${NOISE_GLSL}
 
-            // 菲涅尔项与观察方向，多个效果都要用
-            float fresnel(vec3 nrm, vec3 viewDir) {
-              return 1.0 - clamp(dot(normalize(nrm), normalize(viewDir)), 0.0, 1.0);
-            }
-
             void main() {
               vec3 n = normalize(vObjPos);
-              float fres = fresnel(vNormalW, vViewDirW);
+              float fres = 1.0 - clamp(dot(normalize(vNormalW), normalize(vViewDirW)), 0.0, 1.0);
 
-              /* ── 米粒组织（granulation）：太阳表面的对流元胞 ──
-                 真实的太阳表面是无数小对流胞，边界比中心暗。
-                 用脊状噪声的"反相"来画胞界，比单纯 fbm 更像真太阳。 */
+              /* ── 米粒组织（granulation）──
+                 太阳表面是无数对流元胞，胞界比胞心暗。
+                 用脊状噪声的反相画胞界，比单纯 fbm 更像真太阳。 */
               float g1 = dsFbm(n * 5.5 + vec3(0.0, uTime * 0.020, 0.0), 4);
               float g2 = dsFbm(n * 13.0 - vec3(uTime * 0.015, 0.0, uTime * 0.010), 3);
-              float cells = dsRidge(n * 26.0 + vec3(uTime * 0.010, 0.0, 0.0), 1);
-              // 胞界压暗：cells 高的地方是脊（胞界），把它压下去
-              float granule = (g1 * 0.62 + g2 * 0.30) * (1.0 - cells * 0.34);
+              float cells = dsRidge(n * 26.0 + vec3(uTime * 0.010, 0.0, 0.0), 2);
+              float granule = (g1 * 0.60 + g2 * 0.30) * (1.0 - cells * 0.32);
 
-              // 大尺度对流：让明暗真的在流动，而不是静态噪声
+              /* 大尺度对流：让明暗真的在流动，而不是静态噪声 */
               float flow = dsFbm(n * 2.1 + vec3(uTime * 0.045, uTime * 0.028, 0.0), 3);
+              float heat = clamp(granule * 0.74 + flow * 0.46, 0.0, 1.0);
 
-              float heat = clamp(granule * 0.74 + flow * 0.44, 0.0, 1.0);
-
-              // 色温分层：核心白热 -> 亮黄 -> 金橙 -> 边缘深橙红
-              vec3 deep   = vec3(0.66, 0.14, 0.015);
-              vec3 mid    = vec3(1.00, 0.47, 0.06);
-              vec3 bright = vec3(1.00, 0.85, 0.50);
-              vec3 hot    = vec3(1.00, 0.99, 0.94);
+              /* 色温分层：核心白热 -> 亮黄 -> 金橙 -> 边缘深橙红 */
+              vec3 deep   = vec3(0.86, 0.17, 0.012);
+              vec3 mid    = vec3(1.00, 0.53, 0.07);
+              vec3 bright = vec3(1.00, 0.86, 0.52);
+              vec3 hot    = vec3(1.00, 0.99, 0.95);
               vec3 col = mix(deep, mid, smoothstep(0.08, 0.50, heat));
               col = mix(col, bright, smoothstep(0.46, 0.80, heat));
               col = mix(col, hot, smoothstep(0.78, 1.0, heat));
 
-              /* ── 黑子（sunspot）：磁场抑制对流形成的暗区 ──
-                 只在表面缓慢浮现/消失，边界比中心亮（半影）。 */
-              float spotField = dsFbm(n * 3.3 + vec3(uTime * 0.006, 41.0, 0.0), 2);
+              /* ── 黑子：暗区 + 半影环 ── */
+              float spotField = dsFbm(n * 3.3 + vec3(uTime * 0.006, 41.0, 0.0), 3);
               float spot = smoothstep(0.62, 0.78, spotField);
               float penumbra = smoothstep(0.58, 0.66, spotField) * (1.0 - spot);
-              col = mix(col, col * 0.32, spot * 0.85);
-              col = mix(col, col * 0.72, penumbra * 0.5);
+              col = mix(col, col * 0.30, spot * 0.85);
+              col = mix(col, col * 0.74, penumbra * 0.5);
 
-              /* ── 耀斑/活动区：黑子附近更亮的斑块 ── */
-              float flare = dsRidge(n * 8.5 + vec3(0.0, uTime * 0.03, uTime * 0.02), 1);
-              col += vec3(1.0, 0.72, 0.30) * smoothstep(0.72, 0.95, flare) * spot * 0.9;
+              /* ── 耀斑：黑子附近的亮斑 ── */
+              float flare = dsRidge(n * 8.5 + vec3(0.0, uTime * 0.03, uTime * 0.02), 2);
+              col += vec3(1.0, 0.74, 0.32) * smoothstep(0.72, 0.96, flare) * spot * 0.95;
 
-              /* ── 临边昏暗：越靠边越暗（真实恒星大气的必然现象） ── */
-              col *= mix(1.0, 0.70, pow(fres, 1.4));
+              /* ── 临边昏暗（真实恒星大气的必然现象） ── */
+              col *= mix(1.0, 0.68, pow(fres, 1.25));
 
-              /* ── 日冕过渡：边缘一圈暖色辉光，消除硬轮廓 ── */
-              col += vec3(1.0, 0.50, 0.13) * pow(fres, 2.4) * 0.85;
+              /* ── 边缘白炽环：参考图最显著的特征 ──
+                 球体边缘一圈极亮的白热光，把太阳"框"出来，
+                 再叠一层暖橙过渡，与日冕壳体衔接。 */
+              /* 强度经过实测调整：1.6 时边缘会被推到纯白，
+                 整个球面看起来是一块平的浅色圆盘，颗粒感全丢。 */
+              col += vec3(1.0, 0.97, 0.90) * pow(fres, 3.2) * 0.95;
+              col += vec3(1.0, 0.62, 0.20) * pow(fres, 1.7) * 0.32;
 
               // 热辐射感
-              col += vec3(0.16, 0.10, 0.03) * pow(heat, 3.5);
+              col += vec3(0.18, 0.10, 0.03) * pow(heat, 3.0);
 
               gl_FragColor = vec4(col * uBrightness, 1.0);
             }
@@ -680,61 +708,80 @@ const ACTS = [
       );
 
       const sunGroup = new THREE.Group();
+      /* 太阳本体必须先绘制并写入深度缓冲 —— 否则日冕壳体
+         （depthWrite:false，不写深度）会反过来被本体遮挡，
+         在画面上形成一圈圈同心环（实测踩过的坑）。 */
+      sunCore.renderOrder = 1;
       sunGroup.add(sunCore);
 
-      /* 多层日冕：由内到外逐层变淡变大，柔和过渡而非硬边光斑 */
-      const coronas = [
-        { s: SUN_R * 4.4, i: 'rgba(255,232,184,0.34)', m: 'rgba(255,164,56,0.13)', o: 0.85 },
-        { s: SUN_R * 8.5, i: 'rgba(255,192,106,0.17)', m: 'rgba(255,122,28,0.075)', o: 0.7 },
-        { s: SUN_R * 15.0, i: 'rgba(255,164,78,0.085)', m: 'rgba(255,98,18,0.032)', o: 0.55 },
-      ].map((d) => {
+      /* ── 外层柔光：三层由内到外逐层变淡变大 ──
+         为什么不用球壳做日冕：实测球壳在 fresnel 意义上是"整个球面
+         都在发光"的圆盘，会与本体形成明显可见的同心边界（试了
+         BackSide / FrontSide / 加 alpha 三种写法都不理想）。
+         Sprite 柔光的强度曲线是连续的，不会有硬边界，成本也更低。
+
+         强度刻意压低：太阳本体已经足够亮，外层只是"照亮周围空间"。 */
+      /* 半径与强度都经过实测：内层原来放到 3.0 倍时，
+         它从边缘就开始加色，把边缘又叠白了一层。 */
+      const HALO_LAYERS = [
+        { s: SUN_R * 2.3, i: 'rgba(255,220,160,0.19)', m: 'rgba(255,144,44,0.08)' },
+        { s: SUN_R * 4.6, i: 'rgba(255,190,104,0.12)', m: 'rgba(255,112,24,0.05)' },
+        { s: SUN_R * 8.5, i: 'rgba(255,158,68,0.07)', m: 'rgba(255,92,16,0.025)' },
+      ];
+      const sunHalos = HALO_LAYERS.map((d, i) => {
         const sp = new THREE.Sprite(
           new THREE.SpriteMaterial({
             map: makeSoftSprite(d.i, d.m, 256),
             transparent: true,
-            opacity: d.o,
             depthWrite: false,
+            depthTest: false,
             blending: THREE.AdditiveBlending,
             fog: false,
           }),
         );
         sp.scale.setScalar(d.s);
+        sp.renderOrder = 3 + i;
         sunGroup.add(sp);
         return sp;
       });
-      const coronaBase = [SUN_R * 4.4, SUN_R * 8.5, SUN_R * 15.0];
 
       sunGroup.add(new THREE.PointLight(0xffd9a0, 2.2, 0, 0));
       scene.add(new THREE.AmbientLight(0x2a3a54, 0.6));
       scene.add(sunGroup);
 
       /* ══════════════════════════════════════════════════════
-         7. 地球 —— 程序化着色器
-         解决旧版「模糊蓝点」：
-           大陆/海洋（fbm 阈值 + 域扭曲）· 极冠 · 云层（独立漂移）
-           · 夜面城市微光 · 大气边缘光 · 外层大气壳
-         位置固定，不参与公转（保证第二幕构图可控）
+         7. 地球 —— NASA 实拍贴图
+
+         这里放弃程序化生成：噪声只能产出"看起来合理"的假大陆，
+         不可能长出真实的非洲大陆、阿拉伯半岛与马达加斯加。
+         真实贴图彻底解决了这个问题，代价是 3 张贴图的体积。
+
+         日面 / 夜景灯光 / 云层 分别采样后按光照方向合成，
+         于是能同时得到清晰的海陆轮廓 + 夜面城市微光 + 云层质感。
          ══════════════════════════════════════════════════════ */
       const EARTH_R = 132;
       const EARTH_POS = new THREE.Vector3(-40, 1180, -1620);
-      const MOON_POS = new THREE.Vector3(200, 1330, -1380);
+      const MOON_POS = new THREE.Vector3(200, 1470, -1380);
 
       const earthUniforms = {
         uTime: { value: 0 },
         uSunDir: { value: new THREE.Vector3(1, 0, 0) },
+        uDayMap: { value: loadTex(earthDayUrl) },
+        uCloudMap: { value: loadTex(earthCloudsUrl, false) },
+        uLightsMap: { value: loadTex(earthLightsUrl) },
       };
 
       const earthMesh = new THREE.Mesh(
-        new THREE.SphereGeometry(EARTH_R, 112, 80),
+        new THREE.SphereGeometry(EARTH_R, 128, 88),
         new THREE.ShaderMaterial({
           uniforms: earthUniforms,
           fog: false,
           vertexShader: /* glsl */ `
-            varying vec3 vObjPos;
+            varying vec2 vUv;
             varying vec3 vNormalW;
             varying vec3 vViewDirW;
             void main() {
-              vObjPos = position;
+              vUv = uv;
               vec4 worldPos = modelMatrix * vec4(position, 1.0);
               vNormalW = normalize(mat3(modelMatrix) * normal);
               vViewDirW = normalize(cameraPosition - worldPos.xyz);
@@ -743,95 +790,57 @@ const ACTS = [
           `,
           fragmentShader: /* glsl */ `
             precision highp float;
-            varying vec3 vObjPos;
+            varying vec2 vUv;
             varying vec3 vNormalW;
             varying vec3 vViewDirW;
             uniform float uTime;
             uniform vec3 uSunDir;
-
-            ${NOISE_GLSL}
-
-            // 菲涅尔项
-            float fresnel(vec3 nrm, vec3 viewDir) {
-              return 1.0 - clamp(dot(normalize(nrm), normalize(viewDir)), 0.0, 1.0);
-            }
+            uniform sampler2D uDayMap;
+            uniform sampler2D uCloudMap;
+            uniform sampler2D uLightsMap;
 
             void main() {
-              vec3 n = normalize(vObjPos);
               vec3 N = normalize(vNormalW);
               vec3 L = normalize(uSunDir);
-              float lat = abs(n.y);
+              vec3 V = normalize(vViewDirW);
+              float ndl = dot(N, L);
 
-              /* ── 大陆：域扭曲让海岸线不规则 ──
-                 两层不同频率叠加，避免大陆形状过于"团块"。 */
-              float warp  = dsFbm(n * 4.1 + 3.0, 3) - 0.5;
-              float cont  = dsFbm(n * 2.35 + 11.0, 5) + warp * 0.17;
-              float cont2 = dsFbm(n * 6.4 + 53.0, 2) * 0.055;
-              float landF = cont + cont2;
-              float land  = smoothstep(0.500, 0.542, landF);
-              // 海岸线柔化带，用来画浪花
-              float coast = 1.0 - abs(landF - 0.521) / 0.021;
-              coast = clamp(coast, 0.0, 1.0) * (1.0 - land);
+              /* ── 日面：真实海陆轮廓 ──
+                 three.js 那张 earth_atmos 自带一点云，这里压暗它，
+                 好让独立的云层贴图当主角（否则会叠出双层云）。 */
+              vec3 day = texture2D(uDayMap, vUv).rgb;
+              day = mix(vec3(dot(day, vec3(0.299, 0.587, 0.114))), day, 1.22);
+              day *= 0.88;
 
-              /* ── 地形起伏与色带 ── */
-              float relief = dsFbm(n * 9.0 + 27.0, 3);
-              vec3 deepSea = vec3(0.010, 0.048, 0.16);
-              vec3 shalSea = vec3(0.045, 0.185, 0.40);
-              vec3 ocean = mix(deepSea, shalSea, smoothstep(0.25, 0.72, relief));
-
-              vec3 landLo = vec3(0.075, 0.215, 0.075);
-              vec3 landHi = vec3(0.33, 0.375, 0.185);
-              vec3 landCol = mix(landLo, landHi, smoothstep(0.35, 0.75, relief));
-              // 低纬荒漠、中纬草原
-              landCol = mix(vec3(0.50, 0.41, 0.23), landCol, smoothstep(0.10, 0.46, lat));
-              // 高山雪线
-              float snow = smoothstep(0.74, 0.86, relief) * smoothstep(0.18, 0.55, lat);
-              landCol = mix(landCol, vec3(0.82, 0.86, 0.90), snow * 0.8);
-
-              vec3 albedo = mix(ocean, landCol, land);
-
-              /* ── 极冠 ── */
-              float polar = smoothstep(0.755, 0.935, lat + dsFbm(n * 7.0, 3) * 0.065);
-              albedo = mix(albedo, vec3(0.93, 0.96, 1.0), polar);
-
-              /* ── 云层：两层独立噪声，高低云分别漂移 ── */
-              float cLow  = dsFbm(n * 3.1 + vec3(uTime * 0.009, 0.0, uTime * 0.005), 5);
-              float cHigh = dsFbm(n * 7.2 + vec3(uTime * 0.017, 0.0, uTime * 0.011), 3);
-              float clouds = smoothstep(0.50, 0.76, cLow * 0.78 + cHigh * 0.30);
-              clouds *= 0.68 + 0.32 * cos(lat * 3.14159);   // 赤道云带更密
-              float cloudShade = smoothstep(0.30, 0.85, cLow);
-              albedo = mix(albedo, vec3(0.94, 0.96, 1.0), clouds * 0.88);
+              /* ── 云层：独立贴图，随时间缓慢西移 ── */
+              vec2 cuv = vec2(fract(vUv.x + uTime * 0.0016), vUv.y);
+              float clouds = texture2D(uCloudMap, cuv).r;
+              clouds = smoothstep(0.16, 0.86, clouds);
 
               /* ── 光照：朗伯 + 柔和晨昏线 ── */
-              float ndl = dot(N, L);
-              float lit = smoothstep(-0.24, 0.34, ndl);
-              vec3 col = albedo * (0.052 + 1.92 * lit);
+              float lit = smoothstep(-0.20, 0.30, ndl);
 
-              /* ── 云影：云层在下方地表投下的暗斑 ── */
-              col *= mix(1.0, 0.72, cloudShade * clouds * lit * 0.55);
+              /* 云在朝阳侧更亮，背光侧偏灰 */
+              vec3 cloudCol = mix(vec3(0.42, 0.46, 0.54), vec3(1.0, 0.99, 0.97), lit);
+              vec3 albedo = mix(day, cloudCol, clouds * 0.80);
 
-              /* ── 海洋镜面高光：只在海面、朝阳侧出现 ── */
-              float oceanMask = (1.0 - land) * (1.0 - polar);
-              vec3 V = normalize(vViewDirW);
-              vec3 H = normalize(L + V);
-              float spec = pow(max(dot(N, H), 0.0), 42.0);
-              col += vec3(1.0, 0.97, 0.88) * spec * oceanMask * 0.85 * lit;
+              vec3 col = albedo * (0.045 + 1.85 * lit);
 
-              /* ── 海岸浪花：海岸线的细亮边 ── */
-              col += vec3(0.62, 0.78, 0.92) * coast * 0.16 * lit;
-
-              /* ── 夜面城市微光：按陆地聚簇，不是均匀噪点 ── */
+              /* ── 夜面城市灯光：直接用 NASA 夜景贴图 ── */
+              vec3 lights = texture2D(uLightsMap, vUv).rgb;
               float night = 1.0 - lit;
-              float clust = dsFbm(n * 11.0 + 61.0, 4);
-              float dots  = dsRidge(n * 46.0 + 7.0, 1);
-              float cities = smoothstep(0.54, 0.74, clust)
-                           * smoothstep(0.58, 0.92, dots)
-                           * land * night;
-              col += vec3(1.0, 0.74, 0.36) * cities * 1.15;
+              col += lights * night * 1.55;
 
-              /* ── 大气边缘光（菲涅尔）── */
-              float fres = fresnel(N, V);
-              col += vec3(0.26, 0.54, 1.0) * pow(fres, 3.0) * (0.26 + 0.98 * max(ndl, 0.0));
+              /* ── 海洋镜面高光（用亮度反推海陆：海面在日面图上很暗） ── */
+              float oceanMask = 1.0 - smoothstep(0.05, 0.18, dot(day, vec3(0.299, 0.587, 0.114)));
+              vec3 H = normalize(L + V);
+              float spec = pow(max(dot(N, H), 0.0), 52.0);
+              col += vec3(1.0, 0.97, 0.90) * spec * oceanMask * 0.9 * lit
+                     * (1.0 - clouds * 0.8);
+
+              /* ── 大气边缘光（菲涅尔） ── */
+              float fres = 1.0 - clamp(dot(N, V), 0.0, 1.0);
+              col += vec3(0.24, 0.52, 1.0) * pow(fres, 2.6) * (0.30 + 1.0 * max(ndl, 0.0));
 
               gl_FragColor = vec4(col, 1.0);
             }
@@ -843,7 +852,7 @@ const ACTS = [
 
       /* 外层大气壳：背面渲染的加色菲涅尔，让轮廓发光 */
       const earthAtmo = new THREE.Mesh(
-        new THREE.SphereGeometry(EARTH_R * 1.06, 64, 44),
+        new THREE.SphereGeometry(EARTH_R * 1.075, 80, 56),
         new THREE.ShaderMaterial({
           uniforms: { uSunDir: earthUniforms.uSunDir },
           transparent: true,
@@ -867,8 +876,8 @@ const ACTS = [
             uniform vec3 uSunDir;
             void main() {
               float fres = 1.0 - clamp(dot(normalize(vNormalW), normalize(vViewDirW)), 0.0, 1.0);
-              float lit = 0.30 + 0.85 * max(dot(normalize(vNormalW), normalize(uSunDir)), 0.0);
-              gl_FragColor = vec4(vec3(0.28, 0.56, 1.0), pow(fres, 2.6) * lit * 0.55);
+              float lit = 0.28 + 0.90 * max(dot(normalize(vNormalW), normalize(uSunDir)), 0.0);
+              gl_FragColor = vec4(vec3(0.30, 0.58, 1.0), pow(fres, 2.4) * lit * 0.62);
             }
           `,
         }),
@@ -876,14 +885,16 @@ const ACTS = [
       earthAtmo.position.copy(EARTH_POS);
       scene.add(earthAtmo);
 
-      /* 月球：体积明显更小（0.27 倍地球），沉稳的灰 */
+      /* 月球：体积明显更小（0.27 倍地球）。
+         用真实月面贴图，但整体压暗 —— 它是伴随天体，不抢地球主体。 */
       const moonMesh = new THREE.Mesh(
-        new THREE.SphereGeometry(EARTH_R * 0.27, 36, 26),
+        new THREE.SphereGeometry(EARTH_R * 0.27, 48, 34),
         new THREE.MeshStandardMaterial({
-          color: 0x9a978f,
-          roughness: 0.97,
+          map: loadTex(moonMapUrl),
+          roughness: 0.98,
           metalness: 0,
-          emissive: 0x14161c,
+          emissive: 0x0b0d12,
+          color: 0xb9b6ae,
         }),
       );
       moonMesh.position.copy(MOON_POS);
@@ -1325,7 +1336,7 @@ const ACTS = [
         earthUniforms.uSunDir.value.copy(EARTH_POS).negate().normalize();
 
         /* 自转与滚动解耦 */
-        sunCore.rotation.y = elapsed * 0.012;
+        sunCore.rotation.y = elapsed * 0.0075;
         earthMesh.rotation.y = elapsed * 0.03;
         earthAtmo.rotation.y = earthMesh.rotation.y;
         planets.forEach((m, i) => {
@@ -1370,10 +1381,11 @@ const ACTS = [
         sparkGeo.attributes.position.needsUpdate = true;
         (cometSparks.material as THREE.PointsMaterial).opacity = 0.7 * (0.5 + p * 0.5);
 
-        /* 日冕呼吸：极缓慢，有生命感但不喧哗 */
-        coronas.forEach((sp, i) => {
-          const k = 1 + Math.sin(elapsed * (0.5 + i * 0.14) + i) * 0.028;
-          sp.scale.setScalar(coronaBase[i] * k);
+        /* 外层柔光：各层以不同频率呼吸，幅度很小。
+           强度都远低于本体，所以不会暴露出分层的边界。 */
+        sunHalos.forEach((sp, i) => {
+          const k = 1 + Math.sin(elapsed * (0.42 + i * 0.15) + i * 1.3) * 0.035;
+          sp.scale.setScalar(HALO_LAYERS[i].s * k);
         });
 
         /* 星云与星场缓慢漂移：制造视差纵深。
