@@ -6,6 +6,7 @@ import '../styles/global.css';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
 import ResumePreview from '../components/ResumePreview.astro';
+import DeepSpaceIntro from '../components/DeepSpaceIntro.astro';
 import { site } from '../data/profile';
 
 interface Props {
@@ -62,8 +63,12 @@ const isHome = Astro.url.pathname === '/';
   </head>
 
   <body class="min-h-screen antialiased">
-    <!-- 全页共用的背景光晕（极慢漂移 + 呼吸），详细设计取舍见 global.css -->
+    <!-- 全页共用的背景光晕（极慢漂移 + 呼吸），详细设计取舍见 global.css。
+         注意：3D 背景启用时该光晕会被组件临时收掉，避免与星云重复叠加。 -->
     <div class="aurora" aria-hidden="true"></div>
+
+    <!-- 全页太阳系流星 3D 背景：画布固定在最底层，滚动进度驱动三幕镜头 -->
+    <DeepSpaceIntro />
 
     <a
       href="#main"

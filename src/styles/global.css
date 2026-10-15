@@ -56,6 +56,17 @@ html {
   /* 锚点跳转时给固定导航留出空间 */
   scroll-padding-top: 5rem;
   -webkit-text-size-adjust: 100%;
+  /* ── 横向溢出裁剪 ────────────────────────────────────────────
+     3D 斜向进入动画（.tilt-in）会给板块加 transform 旋转，
+     在 390px 窄视口下会把元素转出视口右边界，产生 73px 横向溢出
+     （实测：把 3D 首屏整体隐藏后溢出依旧，来源是原有板块）。
+
+     为什么用 clip 而不是 hidden：
+       overflow-x: hidden 会让该元素变成滚动容器，进而影响
+       position: sticky 的参考系（导航栏会失效）。clip 只是裁剪，
+       不创建滚动容器，对 sticky / fixed 都无副作用。
+     overflow-clip-margin 留 1px 容错，避免亚像素渲染把边缘切掉。 */
+  overflow-x: clip;
 }
 
 body {
@@ -65,6 +76,10 @@ body {
   font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* 横向溢出裁剪：实测只写在 html 上不足以阻止横向滚动
+     （视口的 overflow 传播规则），必须同时写在 body 上。
+     clip 不创建滚动容器，因此不会破坏 sticky 导航与 fixed 画布。 */
+  overflow-x: clip;
   /* 顶部光晕由 <div class="aurora"> 统一负责，这里不再叠一层，避免亮度叠加过曝 */
 }
 

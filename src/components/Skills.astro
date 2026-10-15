@@ -1,53 +1,48 @@
 ---
 /**
- * 专业技能 —— 三段式卡片
+ * 专业技能板块 —— 玻璃拟态卡片布局
  *
- * 结构（参考站的做法，信息层级更清楚）：
- *   ① 图标 + 分组名          视觉锚点，一眼区分领域
- *   ② summary 一句话          这个领域我能做到什么
- *   ③ items 技能明细          具体能力 + 在哪用过（evidence）
- *   ④ tags 底部能力标签行      扫一眼抓住关键词
+ * ─────────────────────────────────────────────────────────────
+ * 「外虚内实」怎么实现的（按要求：空白区 ~30% 透明度，文字区 0%）：
  *
- * 视觉权重：核心能力（core）用强调边框 + 更大内边距；其余弱化。
- * 只用图标的颜色和边框区分，不做填充色块 —— 深色下大面积色块会显得廉价。
+ *   <article class="glass-card">        ← 外层：30% 半透明玻璃 + backdrop-blur
+ *     <div class="glass-inner">         ← 内层：承载全部文字
+ *                                        text-shadow 压住背景，保证任何
+ *                                        背景亮度下文字都清晰
+ *     </div>
+ *   </article>
+ *
+ *   外层半透明 -> 空白区域露出 3D 星空（外虚）
+ *   内层文字有暗色描边/投影 -> 文字始终实心可读（内实）
+ *
+ *   这样既满足"空白区透明、文字区不透明"的层次要求，
+ *   又不会因为背景是动态星空而牺牲可读性。
+ *
+ * 性能：backdrop-filter 只加在卡片上，且用 will-change 提示合成层，
+ *       不作用于滚动容器，避免整页重绘。
  */
+
 import { skillGroups, levelLabel } from '../data/skills';
+
+/** 每个技能大类的图标（内联 SVG path，不引入图标库） */
+const icons: Record<string, string> = {
+  interface: 'M4 6h16v12H4zM4 10h16M8 14h4',
+  ui: 'M3 5h18v12H3zM8 21h8M12 17v4',
+  engineering: 'M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8',
+  language: 'M8 4l-4 16M20 4l-4 16M5 9h14M4 15h14',
+  backend: 'M4 5h16v5H4zM4 14h16v5H4zM8 7.5h.01M8 16.5h.01',
+  database: 'M12 3c4.4 0 8 1.3 8 3s-3.6 3-8 3-8-1.3-8-3 3.6-3 8-3zM4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',
+  tools: 'M14.7 6.3a4 4 0 105.4 5.4l-3-3M3 21l7.5-7.5M6 3l4 4-2 2-4-4z',
+  ai: 'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM18 16l.9 2.1L21 19l-2.1.9L18 22l-.9-2.1L15 19l2.1-.9z',
+};
 
 const core = skillGroups.filter((g) => g.core);
 const rest = skillGroups.filter((g) => !g.core);
 
 const levelClass: Record<string, string> = {
-  skill: 'border-accent-500/45 bg-accent-500/12 text-accent-300',
-  familiar: 'border-azure-500/40 bg-azure-500/10 text-azure-300',
-  know: 'border-ink-600 bg-ink-800 text-fog-400',
-};
-
-// 每个分组一个图标，用 24x24 的填充路径
-const icons: Record<string, string> = {
-  // 接口：节点连线
-  api:
-    'M12 2a3 3 0 0 1 3 3c0 1.3-.8 2.4-2 2.8V10h4a2 2 0 0 1 2 2v1.2a3 3 0 1 1-2 0V12H7v1.2a3 3 0 1 1-2 0V12a2 2 0 0 1 2-2h4V7.8A3 3 0 0 1 12 2Zm-6 14a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm12 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2ZM12 4a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z',
-  // UI：光标 + 窗口
-  ui:
-    'M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-6.6l2.3 2.3a1 1 0 0 1-1.4 1.4L12 18.4l-2.3 2.3a1 1 0 1 1-1.4-1.4L10.6 17H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm1 2v9h14V6H5Z',
-  // 工程化：流水线齿轮
-  engineering:
-    'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm0 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm-1.2-8h2.4l.4 2.4 1.6.66 2-1.4 1.7 1.7-1.4 2 .66 1.6L21 9.2v2.4l-2.4.4-.66 1.6 1.4 2-1.7 1.7-2-1.4-1.6.66L13.2 21h-2.4l-.4-2.4-1.6-.66-2 1.4-1.7-1.7 1.4-2-.66-1.6L3 13.2v-2.4l2.4-.4.66-1.6-1.4-2 1.7-1.7 2 1.4 1.6-.66L10.8 2Z',
-  // 测试设计：清单 + 勾
-  'test-design':
-    'M9 2h6a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm0 2v16h6V4H9Zm1.2 11.3 3.5-3.5-1.4-1.4-2.1 2.1-1.1-1.1-1.4 1.4 2.5 2.5Z',
-  // 数据库：柱体
-  database:
-    'M12 2c4.4 0 8 1.3 8 3v14c0 1.7-3.6 3-8 3s-8-1.3-8-3V5c0-1.7 3.6-3 8-3Zm0 2c-3.6 0-6 .8-6 1s2.4 1 6 1 6-.8 6-1-2.4-1-6-1Zm6 4.6c-1.4.8-3.6 1.2-6 1.2s-4.6-.4-6-1.2V11c0 .2 2.4 1 6 1s6-.8 6-1V8.6Zm0 6c-1.4.8-3.6 1.2-6 1.2s-4.6-.4-6-1.2V17c0 .2 2.4 1 6 1s6-.8 6-1v-2.4Z',
-  // 语言：代码尖括号
-  language:
-    'M9.4 4.6 3 11l6.4 6.4 1.4-1.4L5.8 11l5-5-1.4-1.4Zm5.2 0L13.2 6l5 5-5 5 1.4 1.4L21 11l-6.4-6.4Z',
-  // 工具：扳手
-  tools:
-    'm14.7 2.3 3 3a1 1 0 0 1 0 1.4l-1.6 1.6 2.3 2.3a5 5 0 0 1-6.4 6.4l-6.5 6.5a1 1 0 0 1-1.4-1.4l6.5-6.5a5 5 0 0 1 6.4-6.4l-2.3-2.3-1.6 1.6a1 1 0 0 1-1.4 0l-3-3a1 1 0 0 1 0-1.4l2.6-2.6a1 1 0 0 1 1.4 0l2 2 2-2a1 1 0 0 1 1.4 0Z',
-  // 后端：服务器
-  backend:
-    'M4 3h16a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm1 7h14V5H5v5Zm-1 4h16a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1Zm1 7h14v-5H5v5Zm2-10.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Zm0 8a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z',
+  熟练: 'border-accent-500/35 bg-accent-500/10 text-accent-300',
+  熟悉: 'border-azure-400/30 bg-azure-500/10 text-azure-300',
+  了解: 'border-ink-600 bg-ink-850 text-fog-400',
 };
 ---
 
@@ -57,68 +52,57 @@ const icons: Record<string, string> = {
       <p class="eyebrow reveal">Skills</p>
       <h2 class="h-section reveal">专业技能</h2>
       <p class="section-lede reveal">
-        每项技能都标注了我用它在哪个项目里做过什么 —— 这比列一串关键词有用。
-        熟练度分三档：<span class="text-accent-300">熟练</span> ·
+        分八类列出实际用过的能力，每项都标了熟练度与可核对的证据。
+        <span class="text-accent-300">熟练</span> ·
         <span class="text-azure-300">熟悉</span> ·
         <span class="text-fog-400">了解</span>，口径保守，不夸大。
       </p>
     </div>
 
-    <!-- 核心能力：两列，强调边框 -->
+    <!-- 核心能力：两列玻璃卡片，顶部一条强调线 -->
     <div class="mt-10 grid gap-5 lg:grid-cols-2">
       {
         core.map((group) => (
-          <div class="card reveal relative flex flex-col overflow-hidden p-6">
-            {/* 顶部一条强调线，区分核心与非核心 */}
-            <span
-              class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-accent-500/70 via-accent-500/25 to-transparent"
-              aria-hidden="true"
-            />
+          <article class="glass-card glass-card--core reveal">
+            <span class="glass-topline" aria-hidden="true" />
 
-            <div class="flex items-start gap-3.5">
-              <span
-                class="grid size-11 shrink-0 place-items-center rounded-xl border border-accent-500/30 bg-accent-500/10"
-                aria-hidden="true"
-              >
-                <svg class="size-5.5 text-accent-300" viewBox="0 0 24 24" fill="currentColor">
-                  <path d={icons[group.id]} />
-                </svg>
-              </span>
+            <div class="glass-inner">
+              <div class="flex items-start gap-3.5">
+                <span class="glass-icon glass-icon--core" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                    <path d={icons[group.id]} />
+                  </svg>
+                </span>
 
-              <div class="min-w-0 flex-1">
-                <h3 class="text-[15px] font-semibold text-fog-50">{group.name}</h3>
-                <p class="mt-1 text-[13px] leading-relaxed text-accent-300/90">
-                  {group.summary}
-                </p>
+                <div class="min-w-0 flex-1">
+                  <h3 class="text-[15px] font-semibold text-fog-50">{group.name}</h3>
+                  <p class="mt-1 text-[13px] leading-relaxed text-accent-300/90">
+                    {group.summary}
+                  </p>
+                </div>
               </div>
+
+              <ul class="mt-5 flex flex-1 flex-col justify-between gap-4">
+                {group.items.map((item) => (
+                  <li class="border-t border-ink-700/55 pt-4">
+                    <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+                      <span class="text-[13px] font-medium text-fog-100">{item.name}</span>
+                      <span class:list={['glass-level', levelClass[item.level]]}>
+                        {levelLabel[item.level]}
+                      </span>
+                    </div>
+                    <p class="mt-1.5 text-xs leading-relaxed text-fog-400">{item.evidence}</p>
+                  </li>
+                ))}
+              </ul>
+
+              <ul class="glass-tags">
+                {group.tags.map((t) => (
+                  <li class="glass-chip">{t}</li>
+                ))}
+              </ul>
             </div>
-
-            <ul class="mt-5 flex flex-1 flex-col justify-between gap-4">
-              {group.items.map((item) => (
-                <li class="border-t border-ink-700/70 pt-4">
-                  <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-                    <span class="text-[13px] font-medium text-fog-100">{item.name}</span>
-                    <span
-                      class:list={[
-                        'rounded border px-1.5 py-0.5 text-[10px] font-medium',
-                        levelClass[item.level],
-                      ]}
-                    >
-                      {levelLabel[item.level]}
-                    </span>
-                  </div>
-                  <p class="mt-1.5 text-xs leading-relaxed text-fog-500">{item.evidence}</p>
-                </li>
-              ))}
-            </ul>
-
-            {/* 底部能力标签行：扫一眼抓住关键词 */}
-            <ul class="mt-5 flex flex-wrap gap-1.5 border-t border-ink-700/70 pt-4">
-              {group.tags.map((t) => (
-                <li class="chip !text-[11px]">{t}</li>
-              ))}
-            </ul>
-          </div>
+          </article>
         ))
       }
     </div>
@@ -127,49 +111,233 @@ const icons: Record<string, string> = {
     <div class="mt-5 grid gap-5 sm:grid-cols-2">
       {
         rest.map((group) => (
-          <div class="card reveal flex flex-col p-5">
-            <div class="flex items-start gap-3">
-              <span
-                class="grid size-9 shrink-0 place-items-center rounded-lg border border-ink-600 bg-ink-850"
-                aria-hidden="true"
-              >
-                <svg class="size-4.5 text-fog-500" viewBox="0 0 24 24" fill="currentColor">
-                  <path d={icons[group.id]} />
-                </svg>
-              </span>
-              <div class="min-w-0 flex-1">
-                <h3 class="text-sm font-semibold text-fog-50">{group.name}</h3>
-                <p class="mt-0.5 text-[11px] leading-relaxed text-fog-500">{group.summary}</p>
+          <article class="glass-card glass-card--soft reveal">
+            <div class="glass-inner">
+              <div class="flex items-start gap-3">
+                <span class="glass-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                    <path d={icons[group.id]} />
+                  </svg>
+                </span>
+                <div class="min-w-0 flex-1">
+                  <h3 class="text-sm font-semibold text-fog-50">{group.name}</h3>
+                  <p class="mt-0.5 text-[11px] leading-relaxed text-fog-400">{group.summary}</p>
+                </div>
               </div>
+
+              <ul class="mt-4 flex flex-1 flex-col justify-between gap-3">
+                {group.items.map((item) => (
+                  <li>
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span class="text-[13px] text-fog-200">{item.name}</span>
+                      <span class:list={['glass-level !px-1.5 !py-px !text-[10px]', levelClass[item.level]]}>
+                        {levelLabel[item.level]}
+                      </span>
+                    </div>
+                    <p class="mt-1 text-xs leading-relaxed text-fog-400">{item.evidence}</p>
+                  </li>
+                ))}
+              </ul>
+
+              <ul class="glass-tags !mt-4 !pt-3.5">
+                {group.tags.map((t) => (
+                  <li class="glass-chip !text-[10px]">{t}</li>
+                ))}
+              </ul>
             </div>
-
-            <ul class="mt-4 flex flex-1 flex-col justify-between gap-3">
-              {group.items.map((item) => (
-                <li>
-                  <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span class="text-[13px] text-fog-200">{item.name}</span>
-                    <span
-                      class:list={[
-                        'rounded border px-1.5 py-px text-[10px]',
-                        levelClass[item.level],
-                      ]}
-                    >
-                      {levelLabel[item.level]}
-                    </span>
-                  </div>
-                  <p class="mt-1 text-xs leading-relaxed text-fog-500">{item.evidence}</p>
-                </li>
-              ))}
-            </ul>
-
-            <ul class="mt-4 flex flex-wrap gap-1.5 border-t border-ink-700/70 pt-3.5">
-              {group.tags.map((t) => (
-                <li class="chip !py-0.5 !text-[10px]">{t}</li>
-              ))}
-            </ul>
-          </div>
+          </article>
         ))
       }
     </div>
   </div>
 </section>
+
+<style>
+  /* ════════════════════════════════════════════════════════════
+     玻璃拟态卡片
+     ────────────────────────────────────────────────────────────
+     外层 = 玻璃（30% 半透明 + 背景模糊）-> 空白区露出 3D 星空
+     内层 = 文字（text-shadow 压住背景）-> 文字始终实心可读
+     ════════════════════════════════════════════════════════════ */
+
+  .glass-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    border-radius: 1rem;
+    overflow: hidden;
+    /* 边框：极细，带一点冷色，像玻璃边缘的高光 */
+    border: 1px solid rgba(120, 150, 190, 0.16);
+    /* 玻璃底：30% 左右的半透明 + 一点点自上而下的光泽 */
+    background: linear-gradient(
+      158deg,
+      rgba(118, 152, 196, 0.13) 0%,
+      rgba(28, 40, 60, 0.3) 42%,
+      rgba(10, 16, 26, 0.34) 100%
+    );
+    backdrop-filter: blur(14px) saturate(128%);
+    -webkit-backdrop-filter: blur(14px) saturate(128%);
+    /* 微弱内发光：上缘一条极淡的亮边 + 内部柔光 */
+    box-shadow:
+      inset 0 1px 0 rgba(190, 220, 255, 0.13),
+      inset 0 0 42px rgba(90, 140, 200, 0.055),
+      0 18px 44px -30px rgba(0, 0, 0, 0.85);
+    transition:
+      border-color 0.32s ease,
+      box-shadow 0.32s ease,
+      transform 0.32s ease,
+      background 0.32s ease;
+    will-change: transform;
+  }
+
+  /* 悬停：轻微高亮反馈（边框提亮 + 内发光增强 + 极轻微上浮） */
+  .glass-card:hover {
+    border-color: rgba(150, 190, 235, 0.28);
+    background: linear-gradient(
+      158deg,
+      rgba(130, 168, 214, 0.17) 0%,
+      rgba(32, 46, 68, 0.33) 42%,
+      rgba(12, 19, 30, 0.36) 100%
+    );
+    box-shadow:
+      inset 0 1px 0 rgba(200, 228, 255, 0.2),
+      inset 0 0 52px rgba(100, 155, 215, 0.085),
+      0 22px 52px -30px rgba(0, 0, 0, 0.9);
+    transform: translateY(-3px);
+  }
+
+  /* 核心卡片：顶部一条强调线 + 稍强的存在感 */
+  .glass-card--core {
+    padding: 1.5rem;
+  }
+  .glass-card--soft {
+    padding: 1.25rem;
+    backdrop-filter: blur(11px) saturate(120%);
+    -webkit-backdrop-filter: blur(11px) saturate(120%);
+  }
+
+  .glass-topline {
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    height: 1px;
+    background: linear-gradient(
+      to right,
+      rgba(45, 212, 191, 0.7),
+      rgba(45, 212, 191, 0.22) 45%,
+      transparent
+    );
+  }
+
+  /* 内层：承载全部文字。不加背景 —— 文字靠 text-shadow 压住星空 */
+  .glass-inner {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    /* 让文字在任何背景亮度下都清晰：极淡的黑色描边 + 轻微投影 */
+    text-shadow:
+      0 0 1px rgba(2, 4, 8, 0.85),
+      0 1px 3px rgba(2, 4, 8, 0.6);
+  }
+
+  /* ── 图标容器 ─────────────────────────────────────────────── */
+  .glass-icon {
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    flex-shrink: 0;
+    border-radius: 0.7rem;
+    border: 1px solid rgba(120, 150, 190, 0.2);
+    background: rgba(20, 30, 46, 0.55);
+    color: var(--color-fog-400);
+  }
+  .glass-icon svg {
+    width: 1.15rem;
+    height: 1.15rem;
+  }
+  .glass-icon--core {
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 0.85rem;
+    border-color: rgba(45, 212, 191, 0.3);
+    background: rgba(45, 212, 191, 0.1);
+    color: var(--color-accent-300);
+  }
+  .glass-icon--core svg {
+    width: 1.35rem;
+    height: 1.35rem;
+  }
+
+  /* ── 熟练度徽章：小圆角胶囊，深色底浅色字 ─────────────────── */
+  .glass-level {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    border-width: 1px;
+    border-style: solid;
+    padding: 0.1rem 0.55rem;
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1.5;
+    letter-spacing: 0.02em;
+  }
+
+  /* ── 底部标签行 ───────────────────────────────────────────── */
+  .glass-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(120, 150, 190, 0.14);
+    list-style: none;
+  }
+
+  /* 胶囊标签：深色底浅色字，排版紧凑有序 */
+  .glass-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    border: 1px solid rgba(120, 150, 190, 0.2);
+    background: rgba(12, 18, 30, 0.62);
+    padding: 0.16rem 0.6rem;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--color-fog-300);
+    transition:
+      border-color 0.25s ease,
+      color 0.25s ease,
+      background 0.25s ease;
+  }
+  .glass-card:hover .glass-chip {
+    border-color: rgba(45, 212, 191, 0.28);
+    background: rgba(16, 26, 40, 0.7);
+    color: var(--color-fog-100);
+  }
+
+  /* 移动端：backdrop-filter 在部分安卓机上开销较大，
+     降低模糊半径并加厚底色，观感一致但更省电。 */
+  @media (max-width: 767px) {
+    .glass-card,
+    .glass-card--soft {
+      backdrop-filter: blur(8px) saturate(115%);
+      -webkit-backdrop-filter: blur(8px) saturate(115%);
+      background: linear-gradient(
+        158deg,
+        rgba(118, 152, 196, 0.15) 0%,
+        rgba(26, 38, 58, 0.52) 42%,
+        rgba(10, 16, 26, 0.6) 100%
+      );
+    }
+  }
+
+  /* 尊重"减少动态效果"：去掉位移，只保留颜色反馈 */
+  @media (prefers-reduced-motion: reduce) {
+    .glass-card:hover {
+      transform: none;
+    }
+  }
+</style>
