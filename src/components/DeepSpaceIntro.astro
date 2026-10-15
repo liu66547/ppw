@@ -278,6 +278,19 @@ const ACTS = [
           }
           return s / max(n, 1e-4);
         }
+        // 脊状噪声：制造丝状、纤维状的细节（太阳的细颗粒 / 星云丝絮）
+        float dsRidge(vec3 p, int oct) {
+          float a = 0.5, s = 0.0, n = 0.0;
+          for (int i = 0; i < 6; i++) {
+            if (i >= oct) break;
+            float v = 1.0 - abs(dsNoise(p) * 2.0 - 1.0);
+            s += a * v * v;
+            n += a;
+            a *= 0.5;
+            p *= 2.07;
+          }
+          return s / max(n, 1e-4);
+        }
       `;
 
       /* ══════════════════════════════════════════════════════
@@ -454,19 +467,28 @@ const ACTS = [
          5. 星云 + 星际尘埃
          ══════════════════════════════════════════════════════ */
       const nebulaTex = makeNebulaTexture(LOW ? 384 : 512);
+      /* 第二张更"丝絮"的贴图：旋转 180° 使用，避免所有云絮纹理重复 */
+      const nebulaTex2 = makeNebulaTexture(LOW ? 384 : 512);
       const nebulaGroup = new THREE.Group();
+      /** 记录每片星云的基准参数，用于缓慢呼吸与漂移 */
+      const nebulaBases: { sp: THREE.Sprite; base: number; phase: number }[] = [];
       {
         const defs = [
-          { r: 9000, a: 0.5, c: 0x2a4a7a, s: 11000, o: 0.30 },
-          { r: 13000, a: 2.3, c: 0x4a2f6a, s: 14000, o: 0.26 },
-          { r: 17000, a: 3.9, c: 0x1f4f5e, s: 16000, o: 0.22 },
-          { r: 21000, a: 5.4, c: 0x53305a, s: 18000, o: 0.18 },
-          { r: 26000, a: 1.4, c: 0x24406b, s: 22000, o: 0.14 },
+          // r=半径 a=方位角 c=颜色 s=尺寸 o=不透明度 tex=用哪张贴图
+          { r: 8500, a: 0.5, c: 0x2a4a7a, s: 12000, o: 0.30, tex: 0 },
+          { r: 9500, a: 3.6, c: 0x1f4f5e, s: 9000, o: 0.20, tex: 1 },
+          { r: 13000, a: 2.3, c: 0x4a2f6a, s: 15000, o: 0.26, tex: 0 },
+          { r: 15500, a: 5.1, c: 0x24406b, s: 12500, o: 0.18, tex: 1 },
+          { r: 17500, a: 3.9, c: 0x1f4f5e, s: 17000, o: 0.22, tex: 0 },
+          { r: 20000, a: 0.9, c: 0x53305a, s: 15000, o: 0.15, tex: 1 },
+          { r: 25000, a: 3.1, c: 0x2f3f6a, s: 21000, o: 0.15, tex: 1 },
+          // 中央尘埃带：横贯黄道面，给盘面加一层体积感
+          { r: 6500, a: 1.9, c: 0x3d4a72, s: 20000, o: 0.11, tex: 1 },
         ];
         defs.forEach((d, i) => {
           const sp = new THREE.Sprite(
             new THREE.SpriteMaterial({
-              map: nebulaTex,
+              map: d.tex === 0 ? nebulaTex : nebulaTex2,
               color: d.c,
               transparent: true,
               opacity: d.o,
@@ -477,18 +499,19 @@ const ACTS = [
           );
           sp.position.set(
             Math.cos(d.a) * d.r,
-            (Math.random() - 0.5) * 4200 - 800,
+            (Math.random() - 0.5) * 4600 - 700,
             Math.sin(d.a) * d.r,
           );
           sp.scale.setScalar(d.s);
           sp.material.rotation = (i * 1.37) % (Math.PI * 2);
           nebulaGroup.add(sp);
+          nebulaBases.push({ sp, base: d.o, phase: i * 0.9 });
         });
       }
       scene.add(nebulaGroup);
 
       /** 星际尘埃：贴着黄道面的扁平粒子带，营造盘面厚度 */
-      const dustCount = LOW ? 1400 : 3600;
+      const dustCount = LOW ? 1400 : 3800;
       const dustField = (() => {
         const pos = new Float32Array(dustCount * 3);
         const col = new Float32Array(dustCount * 3);
@@ -594,32 +617,55 @@ const ACTS = [
 
             ${NOISE_GLSL}
 
+            // 菲涅尔项与观察方向，多个效果都要用
+            float fresnel(vec3 nrm, vec3 viewDir) {
+              return 1.0 - clamp(dot(normalize(nrm), normalize(viewDir)), 0.0, 1.0);
+            }
+
             void main() {
               vec3 n = normalize(vObjPos);
+              float fres = fresnel(vNormalW, vViewDirW);
 
-              // 表面米粒组织：两层不同尺度、反向缓慢流动
+              /* ── 米粒组织（granulation）：太阳表面的对流元胞 ──
+                 真实的太阳表面是无数小对流胞，边界比中心暗。
+                 用脊状噪声的"反相"来画胞界，比单纯 fbm 更像真太阳。 */
               float g1 = dsFbm(n * 5.5 + vec3(0.0, uTime * 0.020, 0.0), 4);
               float g2 = dsFbm(n * 13.0 - vec3(uTime * 0.015, 0.0, uTime * 0.010), 3);
-              float granule = g1 * 0.68 + g2 * 0.32;
+              float cells = dsRidge(n * 26.0 + vec3(uTime * 0.010, 0.0, 0.0), 1);
+              // 胞界压暗：cells 高的地方是脊（胞界），把它压下去
+              float granule = (g1 * 0.62 + g2 * 0.30) * (1.0 - cells * 0.34);
 
               // 大尺度对流：让明暗真的在流动，而不是静态噪声
               float flow = dsFbm(n * 2.1 + vec3(uTime * 0.045, uTime * 0.028, 0.0), 3);
 
-              float heat = clamp(granule * 0.72 + flow * 0.44, 0.0, 1.0);
+              float heat = clamp(granule * 0.74 + flow * 0.44, 0.0, 1.0);
 
-              // 色温分层
-              vec3 deep   = vec3(0.70, 0.17, 0.02);
-              vec3 mid    = vec3(1.00, 0.50, 0.07);
-              vec3 bright = vec3(1.00, 0.86, 0.52);
-              vec3 hot    = vec3(1.00, 0.99, 0.93);
-              vec3 col = mix(deep, mid, smoothstep(0.10, 0.52, heat));
-              col = mix(col, bright, smoothstep(0.48, 0.82, heat));
-              col = mix(col, hot, smoothstep(0.80, 1.0, heat));
+              // 色温分层：核心白热 -> 亮黄 -> 金橙 -> 边缘深橙红
+              vec3 deep   = vec3(0.66, 0.14, 0.015);
+              vec3 mid    = vec3(1.00, 0.47, 0.06);
+              vec3 bright = vec3(1.00, 0.85, 0.50);
+              vec3 hot    = vec3(1.00, 0.99, 0.94);
+              vec3 col = mix(deep, mid, smoothstep(0.08, 0.50, heat));
+              col = mix(col, bright, smoothstep(0.46, 0.80, heat));
+              col = mix(col, hot, smoothstep(0.78, 1.0, heat));
 
-              // 菲涅尔：日冕过渡 + 临边昏暗
-              float fres = 1.0 - clamp(dot(normalize(vNormalW), normalize(vViewDirW)), 0.0, 1.0);
-              col *= mix(1.0, 0.76, pow(fres, 1.5));
-              col += vec3(1.0, 0.52, 0.14) * pow(fres, 2.6) * 0.9;
+              /* ── 黑子（sunspot）：磁场抑制对流形成的暗区 ──
+                 只在表面缓慢浮现/消失，边界比中心亮（半影）。 */
+              float spotField = dsFbm(n * 3.3 + vec3(uTime * 0.006, 41.0, 0.0), 2);
+              float spot = smoothstep(0.62, 0.78, spotField);
+              float penumbra = smoothstep(0.58, 0.66, spotField) * (1.0 - spot);
+              col = mix(col, col * 0.32, spot * 0.85);
+              col = mix(col, col * 0.72, penumbra * 0.5);
+
+              /* ── 耀斑/活动区：黑子附近更亮的斑块 ── */
+              float flare = dsRidge(n * 8.5 + vec3(0.0, uTime * 0.03, uTime * 0.02), 1);
+              col += vec3(1.0, 0.72, 0.30) * smoothstep(0.72, 0.95, flare) * spot * 0.9;
+
+              /* ── 临边昏暗：越靠边越暗（真实恒星大气的必然现象） ── */
+              col *= mix(1.0, 0.70, pow(fres, 1.4));
+
+              /* ── 日冕过渡：边缘一圈暖色辉光，消除硬轮廓 ── */
+              col += vec3(1.0, 0.50, 0.13) * pow(fres, 2.4) * 0.85;
 
               // 热辐射感
               col += vec3(0.16, 0.10, 0.03) * pow(heat, 3.5);
@@ -666,7 +712,7 @@ const ACTS = [
            · 夜面城市微光 · 大气边缘光 · 外层大气壳
          位置固定，不参与公转（保证第二幕构图可控）
          ══════════════════════════════════════════════════════ */
-      const EARTH_R = 86;
+      const EARTH_R = 132;
       const EARTH_POS = new THREE.Vector3(-40, 1180, -1620);
       const MOON_POS = new THREE.Vector3(200, 1330, -1380);
 
@@ -676,7 +722,7 @@ const ACTS = [
       };
 
       const earthMesh = new THREE.Mesh(
-        new THREE.SphereGeometry(EARTH_R, 96, 64),
+        new THREE.SphereGeometry(EARTH_R, 112, 80),
         new THREE.ShaderMaterial({
           uniforms: earthUniforms,
           fog: false,
@@ -702,48 +748,87 @@ const ACTS = [
 
             ${NOISE_GLSL}
 
+            // 菲涅尔项
+            float fresnel(vec3 nrm, vec3 viewDir) {
+              return 1.0 - clamp(dot(normalize(nrm), normalize(viewDir)), 0.0, 1.0);
+            }
+
             void main() {
               vec3 n = normalize(vObjPos);
-
-              // 大陆：低频 fbm 阈值 + 域扭曲，海岸线不规则
-              float warp = dsFbm(n * 4.1 + 3.0, 3) - 0.5;
-              float cont = dsFbm(n * 2.35 + 11.0, 5) + warp * 0.17;
-              float land = smoothstep(0.500, 0.545, cont);
-
-              // 地形起伏
-              float relief = dsFbm(n * 9.0 + 27.0, 4);
-              vec3 ocean = mix(vec3(0.018, 0.075, 0.22), vec3(0.05, 0.19, 0.40), relief);
-              vec3 landCol = mix(vec3(0.09, 0.24, 0.09), vec3(0.34, 0.38, 0.19),
-                                 smoothstep(0.35, 0.75, relief));
+              vec3 N = normalize(vNormalW);
+              vec3 L = normalize(uSunDir);
               float lat = abs(n.y);
-              landCol = mix(vec3(0.50, 0.41, 0.23), landCol, smoothstep(0.10, 0.44, lat));
+
+              /* ── 大陆：域扭曲让海岸线不规则 ──
+                 两层不同频率叠加，避免大陆形状过于"团块"。 */
+              float warp  = dsFbm(n * 4.1 + 3.0, 3) - 0.5;
+              float cont  = dsFbm(n * 2.35 + 11.0, 5) + warp * 0.17;
+              float cont2 = dsFbm(n * 6.4 + 53.0, 2) * 0.055;
+              float landF = cont + cont2;
+              float land  = smoothstep(0.500, 0.542, landF);
+              // 海岸线柔化带，用来画浪花
+              float coast = 1.0 - abs(landF - 0.521) / 0.021;
+              coast = clamp(coast, 0.0, 1.0) * (1.0 - land);
+
+              /* ── 地形起伏与色带 ── */
+              float relief = dsFbm(n * 9.0 + 27.0, 3);
+              vec3 deepSea = vec3(0.010, 0.048, 0.16);
+              vec3 shalSea = vec3(0.045, 0.185, 0.40);
+              vec3 ocean = mix(deepSea, shalSea, smoothstep(0.25, 0.72, relief));
+
+              vec3 landLo = vec3(0.075, 0.215, 0.075);
+              vec3 landHi = vec3(0.33, 0.375, 0.185);
+              vec3 landCol = mix(landLo, landHi, smoothstep(0.35, 0.75, relief));
+              // 低纬荒漠、中纬草原
+              landCol = mix(vec3(0.50, 0.41, 0.23), landCol, smoothstep(0.10, 0.46, lat));
+              // 高山雪线
+              float snow = smoothstep(0.74, 0.86, relief) * smoothstep(0.18, 0.55, lat);
+              landCol = mix(landCol, vec3(0.82, 0.86, 0.90), snow * 0.8);
 
               vec3 albedo = mix(ocean, landCol, land);
 
-              // 极冠
-              float polar = smoothstep(0.76, 0.94, lat + dsFbm(n * 7.0, 3) * 0.06);
-              albedo = mix(albedo, vec3(0.92, 0.95, 1.0), polar);
+              /* ── 极冠 ── */
+              float polar = smoothstep(0.755, 0.935, lat + dsFbm(n * 7.0, 3) * 0.065);
+              albedo = mix(albedo, vec3(0.93, 0.96, 1.0), polar);
 
-              // 云层：独立噪声 + 缓慢漂移，赤道云带更密
-              float clouds = dsFbm(n * 3.6 + vec3(uTime * 0.008, 0.0, uTime * 0.005), 5);
-              clouds = smoothstep(0.52, 0.78, clouds);
-              clouds *= 0.70 + 0.30 * cos(lat * 3.14159);
-              albedo = mix(albedo, vec3(0.94, 0.96, 1.0), clouds * 0.86);
+              /* ── 云层：两层独立噪声，高低云分别漂移 ── */
+              float cLow  = dsFbm(n * 3.1 + vec3(uTime * 0.009, 0.0, uTime * 0.005), 5);
+              float cHigh = dsFbm(n * 7.2 + vec3(uTime * 0.017, 0.0, uTime * 0.011), 3);
+              float clouds = smoothstep(0.50, 0.76, cLow * 0.78 + cHigh * 0.30);
+              clouds *= 0.68 + 0.32 * cos(lat * 3.14159);   // 赤道云带更密
+              float cloudShade = smoothstep(0.30, 0.85, cLow);
+              albedo = mix(albedo, vec3(0.94, 0.96, 1.0), clouds * 0.88);
 
-              // 光照：朗伯 + 柔和晨昏线
-              float ndl = dot(normalize(vNormalW), normalize(uSunDir));
+              /* ── 光照：朗伯 + 柔和晨昏线 ── */
+              float ndl = dot(N, L);
               float lit = smoothstep(-0.24, 0.34, ndl);
-              vec3 col = albedo * (0.055 + 1.90 * lit);
+              vec3 col = albedo * (0.052 + 1.92 * lit);
 
-              // 夜面城市微光
+              /* ── 云影：云层在下方地表投下的暗斑 ── */
+              col *= mix(1.0, 0.72, cloudShade * clouds * lit * 0.55);
+
+              /* ── 海洋镜面高光：只在海面、朝阳侧出现 ── */
+              float oceanMask = (1.0 - land) * (1.0 - polar);
+              vec3 V = normalize(vViewDirW);
+              vec3 H = normalize(L + V);
+              float spec = pow(max(dot(N, H), 0.0), 42.0);
+              col += vec3(1.0, 0.97, 0.88) * spec * oceanMask * 0.85 * lit;
+
+              /* ── 海岸浪花：海岸线的细亮边 ── */
+              col += vec3(0.62, 0.78, 0.92) * coast * 0.16 * lit;
+
+              /* ── 夜面城市微光：按陆地聚簇，不是均匀噪点 ── */
               float night = 1.0 - lit;
-              float pop = dsFbm(n * 14.0 + 61.0, 4);
-              float cities = smoothstep(0.60, 0.80, pop) * land * night;
-              col += vec3(1.0, 0.72, 0.34) * cities * 0.6;
+              float clust = dsFbm(n * 11.0 + 61.0, 4);
+              float dots  = dsRidge(n * 46.0 + 7.0, 1);
+              float cities = smoothstep(0.54, 0.74, clust)
+                           * smoothstep(0.58, 0.92, dots)
+                           * land * night;
+              col += vec3(1.0, 0.74, 0.36) * cities * 1.15;
 
-              // 大气边缘光
-              float fres = 1.0 - clamp(dot(normalize(vNormalW), normalize(vViewDirW)), 0.0, 1.0);
-              col += vec3(0.26, 0.54, 1.0) * pow(fres, 3.0) * (0.28 + 0.95 * max(ndl, 0.0));
+              /* ── 大气边缘光（菲涅尔）── */
+              float fres = fresnel(N, V);
+              col += vec3(0.26, 0.54, 1.0) * pow(fres, 3.0) * (0.26 + 0.98 * max(ndl, 0.0));
 
               gl_FragColor = vec4(col, 1.0);
             }
@@ -1076,9 +1161,9 @@ const ACTS = [
         // 第一幕太阳在右侧（可见）、第二幕滑到最右、第三幕远小
         const sunX = 0.88 + p * 0.06;
         // 地球：第二幕在右侧醒目出现
-        const earthX = 0.74;
+        const earthX = 0.78;
         const a = aimAt(cam, new THREE.Vector3(0, 0, 0), sunX, 0.3);
-        const b = aimAt(cam, EARTH_POS, earthX, 0.58);
+        const b = aimAt(cam, EARTH_POS, earthX, 0.24);
         // 前段以太阳为主，中段过渡到地球，尾段回到黄道中心
         const t = Math.min(1, Math.max(0, (p - 0.2) / 0.35));
         a.lerp(b, t);
@@ -1086,6 +1171,22 @@ const ACTS = [
           a.lerp(new THREE.Vector3(0, 0, 0), Math.min(1, (p - 0.72) / 0.28));
         }
         return a;
+      }
+
+      /* ── 镜头时间重映射（运镜的电影感来源）─────────────────
+         滚动进度是线性的，但镜头不该匀速走 —— 匀速会显得"机械"。
+         这里把线性进度重映射成有节奏的曲线：
+           p=0    起幅：太阳近景，走得慢（让观众看清）
+           p≈0.45 中段：加速（转场感）
+           p=1    落幅：减速停顿（俯瞰全系）
+         用「正弦缓入缓出 + 中段加速」叠加，两端导数接近 0。 */
+      function shotTiming(p: number): number {
+        const c = Math.min(1, Math.max(0, p));
+        // 基础缓动：两端慢、中间快
+        const eased = c * c * (3 - 2 * c);
+        // 再叠一层更强的中段加速，让"推进"更有力量
+        const punch = Math.sin(Math.PI * c) * 0.18;
+        return Math.min(1, Math.max(0, eased * 0.86 + c * 0.14 + punch * (c > 0 && c < 1 ? 1 : 0)));
       }
 
       /** 分段 smoothstep：严格经过关键帧，绝不冲过头（样条会过冲） */
@@ -1125,8 +1226,8 @@ const ACTS = [
           const savedPos = camera.position.clone();
           const savedQuat = camera.quaternion.clone();
 
-          camera.position.copy(pathAt(CAM_KEYS, p));
-          camera.lookAt(lookAtForP(p));
+          camera.position.copy(pathAt(CAM_KEYS, shotTiming(p)));
+          camera.lookAt(lookAtForP(shotTiming(p)));
           camera.updateMatrixWorld(true);
           camera.updateProjectionMatrix();
 
@@ -1191,10 +1292,31 @@ const ACTS = [
         cometGroup.position.copy(tmpV);
         cometGroup.lookAt(tmpV.clone().add(FLIGHT_DIR));
 
-        /* 相机 */
-        camera.position.copy(pathAt(CAM_KEYS, p));
-        lookTarget.copy(lookAtForP(p));
+        /* ── 相机 ──────────────────────────────────────────────
+           三层叠加，做出"手持摄影"的呼吸感：
+             1) 关键帧轨迹（构图，已经被 aimAt 反解保证命中）
+             2) 镜头时间重映射（速度有节奏，不机械）
+             3) 两段不同频率的微抖（活人的手，不是轨道车）
+           微抖幅度刻意压到极小（位置 ~1.2 单位 / 角度 0.1°），
+           肉眼只感到"画面有生命"，不会察觉在抖。 */
+        const tp = shotTiming(p);
+        camera.position.copy(pathAt(CAM_KEYS, tp));
+
+        const sway = Math.sin(elapsed * 0.31) * 1.2 + Math.sin(elapsed * 0.17 + 1.3) * 0.8;
+        const bob = Math.cos(elapsed * 0.24 + 0.7) * 1.0 + Math.sin(elapsed * 0.13) * 0.6;
+        camera.position.x += sway;
+        camera.position.y += bob;
+        camera.position.z += Math.sin(elapsed * 0.19 + 2.1) * 0.9;
+
+        lookTarget.copy(lookAtForP(tp));
+        // 视线也带一点点漂移，比相机抖动更自然
+        lookTarget.x += Math.sin(elapsed * 0.21 + 0.4) * 2.4;
+        lookTarget.y += Math.cos(elapsed * 0.27 + 1.8) * 1.8;
         camera.lookAt(lookTarget);
+
+        /* 轻微横滚（roll）：真实手持镜头几乎都会有 0.1~0.3° 的倾斜，
+           这一点点倾斜对"电影感"的贡献比想象中大。 */
+        camera.rotateZ(Math.sin(elapsed * 0.16) * 0.0018);
 
         /* 地球的日照方向：从太阳指向地球 */
         earthUniforms.uSunDir.value.copy(EARTH_POS).negate().normalize();
@@ -1251,7 +1373,13 @@ const ACTS = [
           sp.scale.setScalar(coronaBase[i] * k);
         });
 
-        /* 星云与星场缓慢漂移：制造视差纵深 */
+        /* 星云与星场缓慢漂移：制造视差纵深。
+           每片星云额外做极缓慢的呼吸（不透明度 ±12%），
+           让深空"活着"，但幅度远低于察觉阈值，不会像闪烁的霓虹灯。 */
+        nebulaBases.forEach(({ sp, base, phase }) => {
+          (sp.material as THREE.SpriteMaterial).opacity =
+            base * (0.88 + 0.12 * Math.sin(elapsed * 0.11 + phase));
+        });
         nebulaGroup.rotation.y = elapsed * 0.0035;
         nebulaGroup.position.y = Math.sin(elapsed * 0.05) * 90;
         starsFar.rotation.y = elapsed * 0.0018;
