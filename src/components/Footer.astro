@@ -31,7 +31,15 @@ const links = [
 ];
 ---
 
-<footer id="contact" class="relative border-t border-ink-800 bg-ink-900/40">
+<!--
+  注意：这里刻意【不加】深色底（原来是 bg-ink-900/40）。
+  加了之后联系板块的文字实渲染亮度比其他板块低约 8%
+  （实测文字均值 111.5 vs 其他板块平均 121.6），整块看起来发闷。
+  去掉底色后，3D 星野直接透过来，文字亮度与其他板块一致；
+  实测星野在这个位置的亮度不会干扰阅读，所以不需要那层遮罩。
+  上边框保留，作为板块之间的分隔。
+-->
+<footer id="contact" class="relative border-t border-ink-800">
   <!-- 底部一层微弱光晕，收尾不显得突兀 -->
   <div
     class="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-accent-500/[0.05] to-transparent"
