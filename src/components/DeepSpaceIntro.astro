@@ -117,8 +117,24 @@ const ACTS = [
      画布在 z-index:-1，而 body 的不透明底色会把它盖住，
      所以由组件接管：body 透明，底色交给画布的径向渐变。
      同时收掉原有 .aurora 顶部光晕，避免与 3D 星云重复叠加。 */
+  /* ── 页面基底（兜底）─────────────────────────────────────
+     ⚠️ 这一层是"永不白屏"的保证。
+
+     之前的设计有严重缺陷：body 底色被交给 3D 画布，一旦 3D 没启动
+     （WebGL 不可用 / three 加载失败 / 系统开了「减少动画效果」），
+     页面就是一片纯白或纯黑，访客什么都看不到。
+
+     现在改成：body 自带深空渐变 + 点阵纹理，
+     3D 画布只是叠在它上面的一层增强。3D 挂了，页面依然是完整的深空。 */
   :global(body.ds-3d-page) {
-    background-color: transparent !important;
+    background-color: #04060c;
+    background-image:
+      /* 点阵纹理：淡到几乎看不见，但能给空旷区域一点质感 */
+      radial-gradient(circle at 1px 1px, rgba(120, 160, 220, 0.05) 1px, transparent 0),
+      /* 主渐变：与画布里的渐变保持一致，所以 3D 有无都看不出接缝 */
+      radial-gradient(ellipse 130% 90% at 50% 42%, #070c16 0%, #04060c 55%, #010204 100%);
+    background-size: 34px 34px, 100% 100%;
+    background-attachment: fixed, fixed;
   }
   :global(body.ds-3d-page > .aurora) {
     opacity: 0 !important;
@@ -196,24 +212,59 @@ const ACTS = [
   const host = document.getElementById('ds-bg');
 
   if (host) {
+    /* ── 无条件接管页面底色 ────────────────────────────────
+       这一步必须在最前面、且不依赖任何条件分支 ——
+       它同时承担两个职责：
+         1. 让 3D 画布（z-index:-1）能透出来
+         2. 3D 没启动时作为兜底背景，保证页面永不空白
+       所以哪怕 WebGL 不可用、three 加载失败、用户开了
+       「减少动画效果」，这一行都已经执行过了。 */
+    document.body.classList.add('ds-3d-page');
+
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     let webglOK = false;
+    let webglWhy = '';
     try {
       const probe = document.createElement('canvas');
-      webglOK = !!(
-        window.WebGLRenderingContext &&
-        (probe.getContext('webgl2') || probe.getContext('webgl'))
-      );
-    } catch {
+      const gl2 = probe.getContext('webgl2');
+      const gl1 = gl2 ? null : probe.getContext('webgl');
+      webglOK = !!(window.WebGLRenderingContext && (gl2 || gl1));
+      if (!webglOK) webglWhy = 'no-webgl-context';
+    } catch (e) {
       webglOK = false;
+      webglWhy = 'webgl-probe-threw';
     }
 
-    if (webglOK && !reduceMotion) {
+    /* 降级原因写到 body 的 data 属性上 —— 出问题时能在
+       控制台一眼看出走的是哪条路径，不用猜。 */
+    const reason = !webglOK ? webglWhy : (reduceMotion ? 'reduced-motion' : '');
+    if (reason) {
+      document.body.dataset.dsFallback = reason;
+      // 注意：不要用 %s 占位符 —— console 会原样打出 %s 而不是替换。
+      console.info(
+        '[ds-bg] 3D 背景未启动（原因：' + reason + '），' +
+        '已使用静态深空背景，页面内容不受影响。',
+      );
+    } else {
       import('three')
-        .then((THREE) => boot(THREE))
+        .then((THREE) => {
+          /* boot 内部可能因为任何原因抛错（显卡驱动怪异、
+             着色器编译失败、three 版本行为变化…）。
+             这里兜住它 —— 兜底背景早已生效，所以最坏情况只是
+             "没有 3D"，绝不会白屏或中断后续脚本。 */
+          try {
+            boot(THREE);
+          } catch (err) {
+            document.body.dataset.dsFallback = 'boot-failed';
+            console.warn('[ds-bg] 3D 场景初始化失败，已退回静态深空背景', err);
+          }
+        })
         .catch((err) => {
-          console.warn('[ds-bg] Three.js 加载失败，已退回纯 CSS 背景', err);
+          // three 加载失败：兜底背景已经在生效（.ds-3d-page 早已加上），
+          // 这里只记录原因，页面完全不受影响。
+          document.body.dataset.dsFallback = 'three-load-failed';
+          console.warn('[ds-bg] Three.js 加载失败，已退回静态深空背景', err);
         });
     }
 
@@ -234,7 +285,7 @@ const ACTS = [
       scrim.className = 'ds-scrim';
       document.body.appendChild(scrim);
 
-      document.body.classList.add('ds-3d-page');
+      // 注：body 的 .ds-3d-page 类在外层已无条件加过，这里不用重复
 
       /* ── 1. 渲染器 ───────────────────────────────────────── */
       const renderer = new THREE.WebGLRenderer({
@@ -1581,13 +1632,17 @@ const ACTS = [
         }
       });
 
-      // 上下文丢失：彻底回退到纯 CSS 背景，正文不受任何影响
+      /* WebGL 上下文丢失：卸掉画布与阅读罩，回到静态深空背景。
+         ⚠️ 注意【不要】移除 body 的 .ds-3d-page 类 ——
+         那正是兜底背景的来源，移掉就白屏了。
+         也不移除 body 上的 dsFallback 标记，方便排查。 */
       renderer.domElement.addEventListener('webglcontextlost', (e: Event) => {
         e.preventDefault();
         running = false;
         canvasHost.remove();
         scrim.remove();
-        document.body.classList.remove('ds-3d-page');
+        document.body.dataset.dsFallback = 'context-lost';
+        console.warn('[ds-bg] WebGL 上下文丢失，已退回静态深空背景');
       });
 
       frame();
