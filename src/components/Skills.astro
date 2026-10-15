@@ -168,19 +168,23 @@ const levelClass: Record<string, string> = {
     overflow: hidden;
     /* 边框：极细，带一点冷色，像玻璃边缘的高光 */
     border: 1px solid rgba(120, 150, 190, 0.16);
-    /* 玻璃底：30% 左右的半透明 + 一点点自上而下的光泽 */
+    /* 玻璃底：半透明 + 自上而下的光泽。
+       底色经过实测调深 —— 原来是 (0.13/0.30/0.34)，
+       太阳这类高亮天体透过来会压住文字（用户反馈"看得太杂"）。
+       现在提高暗度并降低 saturate，让它像"深色毛玻璃"而不是"透明塑料"：
+       依然是玻璃拟态（虚化 + 露背景），但透过来的只是柔和光晕。 */
     background: linear-gradient(
       158deg,
-      rgba(118, 152, 196, 0.13) 0%,
-      rgba(28, 40, 60, 0.3) 42%,
-      rgba(10, 16, 26, 0.34) 100%
+      rgba(74, 100, 138, 0.17) 0%,
+      rgba(12, 20, 34, 0.55) 42%,
+      rgba(5, 9, 16, 0.62) 100%
     );
-    backdrop-filter: blur(14px) saturate(128%);
-    -webkit-backdrop-filter: blur(14px) saturate(128%);
+    backdrop-filter: blur(18px) saturate(112%);
+    -webkit-backdrop-filter: blur(18px) saturate(112%);
     /* 微弱内发光：上缘一条极淡的亮边 + 内部柔光 */
     box-shadow:
-      inset 0 1px 0 rgba(190, 220, 255, 0.13),
-      inset 0 0 42px rgba(90, 140, 200, 0.055),
+      inset 0 1px 0 rgba(190, 220, 255, 0.14),
+      inset 0 0 42px rgba(90, 140, 200, 0.05),
       0 18px 44px -30px rgba(0, 0, 0, 0.85);
     transition:
       border-color 0.32s ease,
@@ -195,13 +199,13 @@ const levelClass: Record<string, string> = {
     border-color: rgba(150, 190, 235, 0.28);
     background: linear-gradient(
       158deg,
-      rgba(130, 168, 214, 0.17) 0%,
-      rgba(32, 46, 68, 0.33) 42%,
-      rgba(12, 19, 30, 0.36) 100%
+      rgba(84, 114, 156, 0.21) 0%,
+      rgba(16, 26, 42, 0.57) 42%,
+      rgba(7, 12, 20, 0.64) 100%
     );
     box-shadow:
-      inset 0 1px 0 rgba(200, 228, 255, 0.2),
-      inset 0 0 52px rgba(100, 155, 215, 0.085),
+      inset 0 1px 0 rgba(200, 228, 255, 0.21),
+      inset 0 0 52px rgba(100, 155, 215, 0.08),
       0 22px 52px -30px rgba(0, 0, 0, 0.9);
     transform: translateY(-3px);
   }
@@ -212,8 +216,9 @@ const levelClass: Record<string, string> = {
   }
   .glass-card--soft {
     padding: 1.25rem;
-    backdrop-filter: blur(11px) saturate(120%);
-    -webkit-backdrop-filter: blur(11px) saturate(120%);
+    /* 次要卡片略轻，但仍保留足够的底色遮罩 */
+    backdrop-filter: blur(15px) saturate(108%);
+    -webkit-backdrop-filter: blur(15px) saturate(108%);
   }
 
   .glass-topline {
@@ -319,17 +324,17 @@ const levelClass: Record<string, string> = {
   }
 
   /* 移动端：backdrop-filter 在部分安卓机上开销较大，
-     降低模糊半径并加厚底色，观感一致但更省电。 */
+     降低模糊半径并保持底色遮罩，观感一致但更省电。 */
   @media (max-width: 767px) {
     .glass-card,
     .glass-card--soft {
-      backdrop-filter: blur(8px) saturate(115%);
-      -webkit-backdrop-filter: blur(8px) saturate(115%);
+      backdrop-filter: blur(10px) saturate(105%);
+      -webkit-backdrop-filter: blur(10px) saturate(105%);
       background: linear-gradient(
         158deg,
-        rgba(118, 152, 196, 0.15) 0%,
-        rgba(26, 38, 58, 0.52) 42%,
-        rgba(10, 16, 26, 0.6) 100%
+        rgba(74, 100, 138, 0.19) 0%,
+        rgba(12, 20, 34, 0.66) 42%,
+        rgba(5, 9, 16, 0.72) 100%
       );
     }
   }
