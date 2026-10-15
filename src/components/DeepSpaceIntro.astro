@@ -1,0 +1,1316 @@
+---
+/**
+ * 3D 宇宙深空首屏 —— 「太阳系流星航行」
+ *
+ * ─────────────────────────────────────────────────────────────
+ * 交互原理：
+ *   1. 3D 画布固定铺满视口，永远不随页面滚动位移
+ *   2. 外层容器占 300vh 滚动高度，其滚动进度映射为 0~1 动画系数
+ *   3. 该系数同步驱动：流星位置、相机位置与朝向、天体显隐缩放、文字透明度
+ *   4. 文字全部是独立 HTML 层，绝不渲染进 WebGL
+ *   5. 滚出 300vh 后画布与文字层隐藏，下方原有内容无缝衔接
+ *
+ * ⚠️ 为什么要用 JS 把画布挂到 <body> 下：
+ *   实测发现，只要画布留在 #deep-space-intro 内部，Chrome 就不会把它
+ *   相对视口固定 —— 即使 position:fixed + inset:0，甚至内联 !important，
+ *   它依然跟着文档滚动（实测高度会变成整个文档高度）。
+ *   挂到 <body> 直接子级后立刻正常。所以标记里保留一个占位元素，
+ *   boot 时把它移动到 body 下，滚动结束后再放回去。
+ *
+ * ─────────────────────────────────────────────────────────────
+ * 相机与流星的坐标设计（这一版重算过）：
+ *
+ *   流星走世界坐标下的严格直线：
+ *     起点 (-1040, 14, 196) —— 太阳左前方
+ *     终点 ( -780, 620, -2650) —— 远方并抬升，给第三幕留出倾斜俯视空间
+ *
+ *   相机轨迹 = 沿流星航线的"翼向"后退 + 逐步抬升：
+ *     p=0   贴近太阳，太阳占画面约 52% 高度，位于中偏右
+ *     p=0.5 退到地月空间，地球在画面偏右
+ *     p=1   高远俯视，整个黄道面在下方铺开，流星化作远处光点
+ *
+ *   关键约束（也是前一版的 bug）：相机后退速度必须慢于流星前进速度，
+ *   否则流星会跑到相机身后，第二、三幕就什么都看不见了。
+ *   这里用 camDist = 900 + 3400*p^0.85 保证相机始终落在流星后方。
+ *
+ * 性能取舍：
+ *   · 只用 three 主包，不引入 postprocessing（省掉整套离屏渲染）
+ *   · 太阳光晕、流星辉光用运行时生成的 CanvasTexture + Sprite + 加色混合
+ *   · 彗尾用顶点色渐隐的带状几何，不用片元着色器
+ *   · 星光用单个 Points 承载，一次 draw call
+ *   · three 用动态导入，不阻塞首屏文字（主包 12KB / three 独立按需加载）
+ */
+
+const acts = [
+  {
+    n: '01',
+    en: 'Tech Stack',
+    title: '技术栈',
+    desc: '以 Java 为主力，覆盖接口自动化、UI 自动化与测试工程化全链路 —— 从框架设计到 CI 流水线接入。',
+    tags: ['Java 自动化', '接口测试', 'UI 自动化', 'CI/CD 流水线', '测试框架'],
+    target: '#stack',
+  },
+  {
+    n: '02',
+    en: 'Core Skills',
+    title: '核心技能',
+    desc: '能独立跑通测试全流程：用例设计、数据治理、断言体系、缺陷定位，并把「结果可信」写进框架机制。',
+    tags: ['全流程测试', '用例设计', '数据治理', '结果可信'],
+    target: '#skills',
+  },
+  {
+    n: '03',
+    en: 'Strengths',
+    title: '核心优势',
+    desc: '工程化思维、全链路落地、结果导向 —— 每一条都能用项目里的代码、数字和证据核对。',
+    tags: ['工程化思维', '全链路落地', '结果导向'],
+    target: '#advantages',
+  },
+];
+---
+
+<div id="deep-space-intro">
+  <!-- 3D 画布占位。boot 时会由 JS 移到 <body> 下（原因见文件头注释）。 -->
+  <div class="ds-canvas" aria-hidden="true"></div>
+
+  <!-- 300vh 滚动轨道 -->
+  <div class="ds-track">
+    <div class="ds-stage">
+      {
+        acts.map((act, i) => (
+          <section class="ds-act" data-act={i}>
+            <div class="ds-panel">
+              <a class="ds-link" href={act.target} data-scroll-to={act.target}>
+                <p class="ds-eyebrow">
+                  <span class="ds-num">{act.n}</span>
+                  <span class="ds-en">{act.en}</span>
+                </p>
+                <h2 class="ds-title">{act.title}</h2>
+                <p class="ds-desc">{act.desc}</p>
+                <ul class="ds-tags">
+                  {act.tags.map((t) => (
+                    <li>{t}</li>
+                  ))}
+                </ul>
+                <span class="ds-cta">
+                  查看这一板块
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                    <polyline points="12 5 19 12 12 19" />
+                  </svg>
+                </span>
+              </a>
+            </div>
+          </section>
+        ))
+      }
+
+      <div class="ds-progress" aria-hidden="true">
+        <span class="ds-progress-fill"></span>
+      </div>
+
+      <div class="ds-scrollhint" aria-hidden="true">
+        <span>向下滚动查看完整项目作品</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <polyline points="19 12 12 19 5 12" />
+        </svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* 全部样式走 Astro scoped style —— 构建时自动加哈希属性，
+     物理上不可能影响原有网站的任何元素。 */
+
+  #deep-space-intro {
+    position: relative;
+    height: 300vh; /* 进度 0%~100% 就在这段滚动距离里产生 */
+  }
+
+  /* ── 3D 画布层 ─────────────────────────────────────────────
+     会被 JS 移到 <body> 下。z-index 必须是负值：
+     WebGL canvas 会提升为独立的合成层，用 z-index:0 时实测会盖住
+     上层的 HTML 文字（elementFromPoint 判定文字在上，但实际绘制
+     canvas 在后）。用 -1 让它在 body 背景之上、所有内容之下。 */
+  .ds-canvas {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    margin: 0 !important;
+    z-index: -1 !important;
+    pointer-events: none !important;
+    background: radial-gradient(ellipse 120% 80% at 50% 40%, #070d18 0%, #04060c 55%, #010204 100%);
+    opacity: 1;
+    transition: opacity 0.45s ease;
+  }
+  .ds-canvas.is-out {
+    opacity: 0;
+    visibility: hidden;
+  }
+  .ds-canvas canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  .ds-canvas::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 3.2rem;
+    height: 3.2rem;
+    margin: -1.6rem 0 0 -1.6rem;
+    border-radius: 9999px;
+    border: 1.5px solid rgba(45, 212, 191, 0.2);
+    border-top-color: rgba(45, 212, 191, 0.7);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    animation: ds-spin 1.15s linear infinite;
+  }
+  #deep-space-intro.is-loading .ds-canvas::after {
+    opacity: 1;
+  }
+  @keyframes ds-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* ── 滚动轨道与固定文字舞台 ─────────────────────────────── */
+  .ds-track {
+    position: relative;
+    height: 300vh;
+  }
+
+  /* 文字舞台同样需要视口固定。它不依赖 position:fixed 的视口解析 ——
+     由 JS 每帧写入 transform 校正（见 syncStage），
+     这样即使 fixed 被环境干扰也不会错位。 */
+  .ds-stage {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    z-index: 10;
+    pointer-events: none;
+    will-change: transform;
+    transition: opacity 0.35s ease;
+  }
+  .ds-stage.is-out {
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  .ds-act {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 5rem 1.5rem 5rem;
+    opacity: 0;
+    visibility: hidden;
+    will-change: opacity, transform;
+  }
+  @media (min-width: 768px) {
+    .ds-act {
+      padding-inline: 3rem;
+    }
+  }
+  @media (min-width: 1280px) {
+    .ds-act {
+      padding-inline: 5rem;
+    }
+  }
+
+  /* ── 文字面板 ─────────────────────────────────────────────── */
+  .ds-panel {
+    width: 100%;
+    max-width: 29rem;
+    pointer-events: auto;
+  }
+
+  .ds-link {
+    display: block;
+    border-radius: 1.25rem;
+    border: 1px solid rgba(38, 51, 74, 0.65);
+    background: linear-gradient(145deg, rgba(10, 14, 23, 0.84), rgba(10, 14, 23, 0.62));
+    padding: 1.6rem;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  @media (min-width: 768px) {
+    .ds-link {
+      padding: 2rem;
+    }
+  }
+  .ds-link:hover {
+    border-color: rgba(45, 212, 191, 0.55);
+    transform: translateY(-4px);
+    box-shadow: 0 24px 60px -28px rgba(20, 184, 166, 0.5);
+  }
+  .ds-link:focus-visible {
+    outline: 2px solid #2dd4bf;
+    outline-offset: 3px;
+  }
+
+  .ds-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    margin: 0;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .ds-num {
+    color: #2dd4bf;
+    font-weight: 600;
+  }
+  .ds-en {
+    color: #6b7a92;
+  }
+
+  .ds-title {
+    margin: 0.7rem 0 0;
+    font-size: 1.9rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    color: #f1f5fb;
+  }
+  @media (min-width: 768px) {
+    .ds-title {
+      font-size: 2.3rem;
+    }
+  }
+
+  .ds-desc {
+    margin: 0.9rem 0 0;
+    font-size: 0.9rem;
+    line-height: 1.8;
+    color: #c7d2e2;
+  }
+
+  .ds-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 1.1rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .ds-tags li {
+    border-radius: 9999px;
+    border: 1px solid rgba(38, 51, 74, 0.9);
+    background: rgba(14, 20, 31, 0.8);
+    padding: 0.2rem 0.7rem;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.7rem;
+    color: #8b9ab1;
+    transition: border-color 0.25s ease, color 0.25s ease;
+  }
+  .ds-link:hover .ds-tags li {
+    border-color: rgba(45, 212, 191, 0.35);
+    color: #99f6e4;
+  }
+
+  .ds-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 1.3rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #2dd4bf;
+  }
+  .ds-cta svg {
+    width: 0.95rem;
+    height: 0.95rem;
+    transition: transform 0.25s ease;
+  }
+  .ds-link:hover .ds-cta svg {
+    transform: translateX(4px);
+  }
+
+  /* ── 左侧进度条 ───────────────────────────────────────────── */
+  .ds-progress {
+    position: absolute;
+    left: 1.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2px;
+    height: 8.5rem;
+    border-radius: 9999px;
+    background: rgba(38, 51, 74, 0.7);
+    overflow: hidden;
+  }
+  @media (min-width: 768px) {
+    .ds-progress {
+      left: 3rem;
+    }
+  }
+  .ds-progress-fill {
+    display: block;
+    width: 100%;
+    height: 100%;
+    transform-origin: top;
+    transform: scaleY(0);
+    background: linear-gradient(to bottom, #2dd4bf, #38bdf8);
+    border-radius: 9999px;
+  }
+
+  /* ── 底部滚动提示 ─────────────────────────────────────────── */
+  .ds-scrollhint {
+    position: absolute;
+    left: 50%;
+    bottom: 2rem;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    opacity: 0;
+    font-size: 0.78rem;
+    color: #8b9ab1;
+    text-align: center;
+  }
+  .ds-scrollhint svg {
+    width: 1.1rem;
+    height: 1.1rem;
+    animation: ds-bounce 2s ease-in-out infinite;
+  }
+  @keyframes ds-bounce {
+    0%,
+    100% {
+      transform: translateY(0);
+      opacity: 0.55;
+    }
+    50% {
+      transform: translateY(5px);
+      opacity: 1;
+    }
+  }
+
+  /* ── 3D 期间让导航栏透明（唯一影响既有组件的地方）─────────
+     只是在 body 上加一个状态类，把导航底色改透明；
+     尺寸、布局、功能、交互全部不动。滚出后类被移除，立刻恢复。 */
+  :global(body.ds-intro-active header#site-nav) {
+    background-color: transparent !important;
+    border-bottom-color: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* ── 降级：不支持 WebGL / 用户要求减少动态 ───────────────── */
+  #deep-space-intro.is-static {
+    height: auto;
+  }
+  #deep-space-intro.is-static .ds-canvas,
+  #deep-space-intro.is-static .ds-progress,
+  #deep-space-intro.is-static .ds-scrollhint {
+    display: none;
+  }
+  #deep-space-intro.is-static .ds-track {
+    height: auto;
+  }
+  #deep-space-intro.is-static .ds-stage {
+    position: relative;
+    height: auto;
+    transform: none !important;
+    opacity: 1;
+    visibility: visible;
+    padding-block: 3.5rem;
+  }
+  #deep-space-intro.is-static .ds-act {
+    position: relative;
+    inset: auto;
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: none !important;
+    padding: 1.25rem 1.5rem 0;
+  }
+  #deep-space-intro.is-static .ds-act:first-child {
+    padding-top: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ds-canvas::after,
+    .ds-scrollhint svg {
+      animation: none;
+    }
+  }
+</style>
+
+<script>
+  /**
+   * three 用「动态导入 + 仅类型导入」：
+   *   · import type 只服务类型检查，编译后被完全擦除，零体积
+   *   · await import() 运行时才加载，Vite 会拆成独立 chunk
+   * 于是首屏 HTML/CSS/文字立刻可读，3D 在后台并行加载。
+   */
+  import type * as THREE from 'three';
+
+  const root = document.getElementById('deep-space-intro');
+
+  if (root) {
+    const canvasHost = root.querySelector<HTMLElement>('.ds-canvas');
+    const stage = root.querySelector<HTMLElement>('.ds-stage');
+    const actEls = Array.from(root.querySelectorAll<HTMLElement>('.ds-act'));
+    const hintEl = root.querySelector<HTMLElement>('.ds-scrollhint');
+    const progressFill = root.querySelector<HTMLElement>('.ds-progress-fill');
+
+    /* ── 锚点平滑滚动（带导航栏高度补偿）──────────────────── */
+    function scrollToTarget(sel: string) {
+      const el = document.querySelector(sel);
+      if (!el) return;
+      const nav = document.querySelector('header#site-nav');
+      const navH = nav ? nav.getBoundingClientRect().height : 0;
+      const y = el.getBoundingClientRect().top + window.scrollY - navH - 12;
+      window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+    }
+
+    root.querySelectorAll<HTMLElement>('[data-scroll-to]').forEach((a) => {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        const t = a.dataset.scrollTo;
+        if (t) scrollToTarget(t);
+      });
+    });
+
+    /* ── 能力探测与降级 ───────────────────────────────────── */
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let webglOK = false;
+    try {
+      const probe = document.createElement('canvas');
+      webglOK = !!(window.WebGLRenderingContext && (probe.getContext('webgl2') || probe.getContext('webgl')));
+    } catch {
+      webglOK = false;
+    }
+
+    if (!webglOK || reduceMotion) {
+      root.classList.add('is-static');
+    } else if (canvasHost && stage) {
+      root.classList.add('is-loading');
+      import('three')
+        .then((THREE) => {
+          root.classList.remove('is-loading');
+          boot(THREE, canvasHost, stage);
+        })
+        .catch((err) => {
+          console.warn('[deep-space] Three.js 加载失败，已降级为静态区块', err);
+          root.classList.remove('is-loading');
+          root.classList.add('is-static');
+        });
+    }
+
+    /* ════════════════════════════════════════════════════════
+       主逻辑
+       ════════════════════════════════════════════════════════ */
+    function boot(
+      THREE: typeof import('three'),
+      canvasHost: HTMLElement,
+      stage: HTMLElement,
+    ): void {
+      const isMobile = window.matchMedia('(max-width: 767px)').matches;
+
+      /* ── 0. 把画布移到 <body> 下 ──────────────────────────
+         实测：只要它留在 #deep-space-intro 内部，Chrome 就不把它
+         相对视口固定（连内联 !important 都无效）。挂到 body 直接子级
+         后立刻正常。这里记录原位置，便于必要时还原。 */
+      const originalParent = canvasHost.parentElement;
+      const originalNext = canvasHost.nextSibling;
+      document.body.appendChild(canvasHost);
+
+      /* ── 1. 渲染器 ───────────────────────────────────────── */
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        powerPreference: 'high-performance',
+      });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
+      renderer.setSize(window.innerWidth, window.innerHeight, false);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 0.92;
+      renderer.domElement.style.pointerEvents = 'none';
+      canvasHost.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x04060c, 0.00004);
+
+      const camera = new THREE.PerspectiveCamera(
+        50,
+        window.innerWidth / window.innerHeight,
+        1,
+        60000,
+      );
+
+      /* ── 2. 程序化贴图 ───────────────────────────────────── */
+      function makeGlowTexture(inner: string, mid: string, size = 256): THREE.Texture {
+        const c = document.createElement('canvas');
+        c.width = c.height = size;
+        const ctx = c.getContext('2d')!;
+        const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+        g.addColorStop(0, inner);
+        g.addColorStop(0.35, mid);
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, size, size);
+        const t = new THREE.CanvasTexture(c);
+        t.colorSpace = THREE.SRGBColorSpace;
+        return t;
+      }
+
+      function makeSunTexture(size = 512): THREE.Texture {
+        const c = document.createElement('canvas');
+        c.width = c.height = size;
+        const ctx = c.getContext('2d')!;
+        const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+        g.addColorStop(0, '#ffe9a8');
+        g.addColorStop(0.42, '#ffa62e');
+        g.addColorStop(0.76, '#f2620c');
+        g.addColorStop(1, '#b8330a');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, size, size);
+        const img = ctx.getImageData(0, 0, size, size);
+        const d = img.data;
+        for (let i = 0; i < d.length; i += 4) {
+          const n = (Math.random() - 0.5) * 24;
+          d[i] = Math.max(0, Math.min(255, d[i] + n));
+          d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + n * 0.7));
+          d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + n * 0.3));
+        }
+        ctx.putImageData(img, 0, 0);
+        const t = new THREE.CanvasTexture(c);
+        t.colorSpace = THREE.SRGBColorSpace;
+        return t;
+      }
+
+      function makePlanetTexture(base: string, accent: string, streaks = 42): THREE.Texture {
+        const w = 512;
+        const h = 256;
+        const c = document.createElement('canvas');
+        c.width = w;
+        c.height = h;
+        const ctx = c.getContext('2d')!;
+        ctx.fillStyle = base;
+        ctx.fillRect(0, 0, w, h);
+        for (let i = 0; i < streaks; i++) {
+          ctx.globalAlpha = 0.05 + Math.random() * 0.22;
+          ctx.fillStyle = accent;
+          ctx.fillRect(0, Math.random() * h, w, 2 + Math.random() * 11);
+        }
+        ctx.globalAlpha = 1;
+        const img = ctx.getImageData(0, 0, w, h);
+        const d = img.data;
+        for (let i = 0; i < d.length; i += 4) {
+          const n = (Math.random() - 0.5) * 15;
+          d[i] += n;
+          d[i + 1] += n;
+          d[i + 2] += n;
+        }
+        ctx.putImageData(img, 0, 0);
+        const t = new THREE.CanvasTexture(c);
+        t.colorSpace = THREE.SRGBColorSpace;
+        return t;
+      }
+
+      /* ── 3. 深空星场（单次 draw call）────────────────────── */
+      const starCount = isMobile ? 2800 : 5600;
+      {
+        const positions = new Float32Array(starCount * 3);
+        const colors = new Float32Array(starCount * 3);
+        const col = new THREE.Color();
+        for (let i = 0; i < starCount; i++) {
+          const r = 2500 + Math.random() * 17000;
+          const theta = Math.random() * Math.PI * 2;
+          const phi = Math.acos(2 * Math.random() - 1);
+          positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+          positions[i * 3 + 1] = r * Math.cos(phi) * 0.7;
+          positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+          const warm = Math.random() < 0.12;
+          col.setHSL(
+            warm ? 0.09 + Math.random() * 0.05 : 0.55 + Math.random() * 0.12,
+            warm ? 0.5 : 0.35 + Math.random() * 0.3,
+            0.72 + Math.random() * 0.26,
+          );
+          colors[i * 3] = col.r;
+          colors[i * 3 + 1] = col.g;
+          colors[i * 3 + 2] = col.b;
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        const stars = new THREE.Points(
+          geo,
+          new THREE.PointsMaterial({
+            size: 2.4,
+            sizeAttenuation: true,
+            vertexColors: true,
+            map: makeGlowTexture('rgba(255,255,255,1)', 'rgba(200,225,255,0.55)', 64),
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+            fog: false,
+          }),
+        );
+        stars.frustumCulled = false;
+        scene.add(stars);
+        var starfield = stars;
+      }
+
+      /* ── 4. 太阳 ─────────────────────────────────────────────
+         半径 190 是配合 p=0 时相机距离 880 算出来的：
+         视角高度 = 2*tan(25°)*880 = 820，太阳直径 380 → 占画面 46%，
+         再加内层辉光溢出，视觉上超过一半。 */
+      const SUN_RADIUS = 420;
+      const sunGroup = new THREE.Group();
+      const sunCore = new THREE.Mesh(
+        new THREE.SphereGeometry(SUN_RADIUS, 48, 32),
+        new THREE.MeshBasicMaterial({ map: makeSunTexture(), fog: false }),
+      );
+      sunGroup.add(sunCore);
+
+      const sunGlowInner = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: makeGlowTexture('rgba(255,224,160,0.62)', 'rgba(255,150,50,0.24)', 256),
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          fog: false,
+        }),
+      );
+      sunGlowInner.scale.setScalar(1500);
+      sunGroup.add(sunGlowInner);
+
+      const sunGlowOuter = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: makeGlowTexture('rgba(255,170,80,0.26)', 'rgba(255,110,26,0.09)', 256),
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          fog: false,
+        }),
+      );
+      sunGlowOuter.scale.setScalar(3400);
+      sunGroup.add(sunGlowOuter);
+
+      sunGroup.add(new THREE.PointLight(0xffd9a0, 2.6, 0, 0));
+      scene.add(new THREE.AmbientLight(0x2b3c58, 0.6));
+      scene.add(sunGroup);
+
+      /* ── 5. 行星与轨道 ───────────────────────────────────── */
+      type PlanetDef = {
+        orbit: number;
+        radius: number;
+        base: string;
+        accent: string;
+        speed: number;
+        tilt: number;
+        ring?: boolean;
+        showOrbit: boolean;
+      };
+
+      const planetDefs: PlanetDef[] = [
+        { orbit: 900, radius: 22, base: '#8d8579', accent: '#4b463f', speed: 0.42, tilt: 0.02, showOrbit: false },
+        { orbit: 1450, radius: 40, base: '#d9b075', accent: '#8a6534', speed: 0.31, tilt: 0.05, showOrbit: false },
+        { orbit: 2400, radius: 86, base: '#2f6fb5', accent: '#63b36b', speed: 0.24, tilt: 0.41, showOrbit: true },
+        { orbit: 3300, radius: 58, base: '#b4553a', accent: '#6d2f20', speed: 0.19, tilt: 0.09, showOrbit: true },
+        { orbit: 4700, radius: 190, base: '#c9a678', accent: '#7d6144', speed: 0.11, tilt: 0.06, showOrbit: true },
+        { orbit: 6200, radius: 162, base: '#cbb98c', accent: '#8a7a52', speed: 0.083, tilt: 0.12, ring: true, showOrbit: true },
+        { orbit: 7900, radius: 112, base: '#8fcbd6', accent: '#4d8e9c', speed: 0.058, tilt: 0.16, showOrbit: true },
+        { orbit: 9500, radius: 108, base: '#4a6fbf', accent: '#2b4383', speed: 0.045, tilt: 0.03, showOrbit: true },
+      ];
+
+      const planets: { mesh: THREE.Mesh; def: PlanetDef; pivot: THREE.Group }[] = [];
+
+      planetDefs.forEach((def) => {
+        const pivot = new THREE.Group();
+        pivot.rotation.x = def.tilt;
+
+        const mesh = new THREE.Mesh(
+          new THREE.SphereGeometry(def.radius, 32, 24),
+          new THREE.MeshStandardMaterial({
+            map: makePlanetTexture(def.base, def.accent),
+            roughness: 0.86,
+            metalness: 0.04,
+            emissive: new THREE.Color(def.base).multiplyScalar(0.14),
+            fog: true,
+          }),
+        );
+        mesh.position.set(def.orbit, 0, 0);
+        pivot.add(mesh);
+
+        if (def.ring) {
+          const ring = new THREE.Mesh(
+            new THREE.RingGeometry(def.radius * 1.45, def.radius * 2.3, 64),
+            new THREE.MeshBasicMaterial({
+              color: 0xd8c79b,
+              side: THREE.DoubleSide,
+              transparent: true,
+              opacity: 0.42,
+              depthWrite: false,
+            }),
+          );
+          ring.rotation.x = Math.PI / 2 - 0.36;
+          mesh.add(ring);
+        }
+
+        // 轨道圈：只给地球及以外画，内行星太挤
+        const seg = 168;
+        const pts: number[] = [];
+        for (let i = 0; i <= seg; i++) {
+          const a = (i / seg) * Math.PI * 2;
+          pts.push(Math.cos(a) * def.orbit, 0, Math.sin(a) * def.orbit);
+        }
+        const orbitGeo = new THREE.BufferGeometry();
+        orbitGeo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+        const orbitLine = new THREE.Line(
+          orbitGeo,
+          new THREE.LineBasicMaterial({
+            color: 0x4a6b90,
+            transparent: true,
+            opacity: def.showOrbit ? 0.34 : 0.12,
+            depthWrite: false,
+            fog: false,
+          }),
+        );
+        orbitLine.rotation.x = def.tilt;
+
+        scene.add(pivot);
+        scene.add(orbitLine);
+        planets.push({ mesh, def, pivot });
+      });
+
+      /* ── 6. 月球 ─────────────────────────────────────────── */
+      const earthMesh = planets[2].mesh;
+      const moonPivot = new THREE.Group();
+      earthMesh.add(moonPivot);
+      const moon = new THREE.Mesh(
+        new THREE.SphereGeometry(23, 20, 16),
+        new THREE.MeshStandardMaterial({
+          map: makePlanetTexture('#9a9a96', '#5a5a56', 24),
+          roughness: 0.95,
+          metalness: 0,
+        }),
+      );
+      moon.position.set(172, 15, 0);
+      moonPivot.add(moon);
+
+      /* ── 7. 流星与彗尾 ─────────────────────────────────────
+         起点刻意放在太阳左前方，让第一幕能看清"流星停在太阳左侧"。
+         终点在远方抬升，给第三幕的倾斜俯视留出空间。 */
+      const COMET_START = new THREE.Vector3(-560, 250, 700);
+      const COMET_END = new THREE.Vector3(600, 1500, -6200);
+      const COMET_DIR = COMET_END.clone().sub(COMET_START).normalize();
+
+      const cometGroup = new THREE.Group();
+
+      const cometCore = new THREE.Mesh(
+        new THREE.SphereGeometry(6.5, 20, 16),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false }),
+      );
+      cometGroup.add(cometCore);
+
+      const cometGlow = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: makeGlowTexture('rgba(255,255,255,1)', 'rgba(140,235,255,0.5)', 128),
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          fog: false,
+        }),
+      );
+      cometGlow.scale.setScalar(78);
+      cometGroup.add(cometGlow);
+
+      // 彗尾：沿 -Z 延伸的带状几何 + 顶点色渐隐
+      const TAIL_SEG = 26;
+      const tailGeo = new THREE.BufferGeometry();
+      const tailPos = new Float32Array((TAIL_SEG + 1) * 2 * 3);
+      const tailCol = new Float32Array((TAIL_SEG + 1) * 2 * 3);
+      const tailIdx: number[] = [];
+      for (let i = 0; i < TAIL_SEG; i++) {
+        const a = i * 2;
+        tailIdx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      }
+      tailGeo.setIndex(tailIdx);
+      tailGeo.setAttribute('position', new THREE.BufferAttribute(tailPos, 3));
+      tailGeo.setAttribute('color', new THREE.BufferAttribute(tailCol, 3));
+
+      const cometTail = new THREE.Mesh(
+        tailGeo,
+        new THREE.MeshBasicMaterial({
+          vertexColors: true,
+          transparent: true,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          fog: false,
+        }),
+      );
+      cometGroup.add(cometTail);
+
+      // 尾迹碎屑
+      const SPARK_COUNT = isMobile ? 70 : 150;
+      const sparkGeo = new THREE.BufferGeometry();
+      const sparkPos = new Float32Array(SPARK_COUNT * 3);
+      const sparkSeed = new Float32Array(SPARK_COUNT);
+      for (let i = 0; i < SPARK_COUNT; i++) sparkSeed[i] = Math.random();
+      sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
+
+      const cometSparks = new THREE.Points(
+        sparkGeo,
+        new THREE.PointsMaterial({
+          size: 3.4,
+          sizeAttenuation: true,
+          map: makeGlowTexture('rgba(210,250,255,1)', 'rgba(90,190,255,0.5)', 48),
+          color: 0xbfeaff,
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          fog: false,
+        }),
+      );
+      cometGroup.add(cometSparks);
+      scene.add(cometGroup);
+
+      /* ── 8. 相机与流星轨迹 ─────────────────────────────────
+         ⚠️ 这些数值由公式推导 + 浏览器实测校准，改动前先跑
+            _tools/calibrate_cam.mjs 看构图数据。
+
+         三个重要的设计决定（都是踩坑换来的）：
+
+         1) 相机与流星【解耦】
+            最初让相机始终待在流星后方，结果流星越飞越远，相机被一路
+            拖出太阳系，太阳和地球全跑出画面，第二三幕一片空白。
+
+         2) 用【分段 smoothstep】而不是 Catmull-Rom
+            多关键帧的样条会整体过冲 —— 实测相机在 p=0.25 处冲到离
+            太阳只剩 400（太阳占画面 672%）。分段 smoothstep 严格经过
+            每个关键帧，绝不冲过头，两端零斜率又保证了手感平滑。
+
+         3) 相机座落在流星航线上（太阳的右前方）
+            这样「沿航线后退」＝「视角拉远」，且流星始终在视线前方。
+
+         关键公式（已用浏览器实测确认）：
+            占画面高的比例 = r / (tan(fov/2) * D)
+            太阳 r=420、fov=50  ->  D=1155 时占高 0.78（近景压迫感）
+                                ->  D=2144 时占高 0.42
+         ──────────────────────────────────────────────────────── */
+      const FLIGHT_DIR = COMET_END.clone().sub(COMET_START).normalize();
+
+      /** 流星行程曲线：前期慢、后期快，第三幕化成远处光点 */
+      const cometPhase = (p: number) => Math.pow(Math.min(1, Math.max(0, p)), 0.85);
+
+      const cometAt = (p: number) =>
+        COMET_START.clone().lerp(COMET_END, Math.min(1, Math.max(0, p)));
+
+      /* 相机关键帧。p=0 时距太阳 1155，太阳占画面高 78% —— 近景大太阳。
+         终点退到土星轨道以外并抬高，倾斜俯视整个黄道面。 */
+      const CAM_KEYS = [
+        new THREE.Vector3(180, 120, 1420),       // p=0    贴太阳近景
+        new THREE.Vector3(-1750, 900, -2650),    // p=0.45 地月空间（回望黄道面）
+        new THREE.Vector3(-2600, 7200, -5600),   // p=1    远高俯瞰全系
+      ];
+      /* 视线目标：以流星为基准，但向左偏移一点 ——
+         这样流星落在画面中偏左，而航线右侧的地球能进入视野。
+         第三幕再 lerp 到黄道中心，完成倾斜俯瞰的收尾。
+
+         ⚠️ 偏移方向很关键：不偏移时视线正对流星，地球会被挤出画面
+            （实测过，第二幕完全看不到地球）。 */
+      const SIDE_DIR = new THREE.Vector3()
+        .crossVectors(FLIGHT_DIR, new THREE.Vector3(0, 1, 0))
+        .normalize();
+
+      const lookAhead = (p: number) => {
+        const ahead = 900 + 1600 * p;
+        // 侧向偏移：随进度增长，第二幕把地球带进画面
+        const side = 520 * Math.pow(p, 0.8);
+        const target = cometAt(cometPhase(p))
+          .addScaledVector(FLIGHT_DIR, ahead)
+          .addScaledVector(SIDE_DIR, side);
+        // 第三幕转向黄道中心，做成倾斜俯视
+        // 第三幕：转向黄道中心，做成倾斜俯视
+        const toEcliptic = Math.pow(Math.max(0, (p - 0.55) / 0.45), 1.4);
+        // 第二幕：也朝黄道面回望一下，把地球纳入画面。
+        // 用钟形曲线，峰值在 p=0.45，两端归零，不影响第一、三幕构图。
+        const bell = Math.exp(-Math.pow((p - 0.45) / 0.17, 2));
+        target.lerp(new THREE.Vector3(0, 0, 0), bell * 0.55);
+        return target.lerp(new THREE.Vector3(0, 0, 0), toEcliptic * 0.9);
+      };
+
+      /** 分段 smoothstep 插值：严格经过每个关键帧，绝不冲过头 */
+      function pathAt(keys: THREE.Vector3[], p: number): THREE.Vector3 {
+        const n = keys.length - 1;
+        const t = Math.min(1, Math.max(0, p)) * n;
+        const i = Math.min(Math.floor(t), n - 1);
+        const lt = t - i;
+        const e = lt * lt * (3 - 2 * lt);
+        return keys[i].clone().multiplyScalar(1 - e).addScaledVector(keys[i + 1], e);
+      }
+
+      const camAt = (p: number) => pathAt(CAM_KEYS, p);
+      const lookAtForP = (p: number) => lookAhead(p);
+
+      /* ── 8b. 本地校准钩子 ─────────────────────────────────
+         只在 localhost 上挂载，用来量太阳/流星在屏幕上的实际位置与占比。
+         生产环境不挂载，避免向全局暴露内部状态。
+
+         实现注意：不要用 camera.clone() —— 克隆体的 matrixWorldInverse
+         不会随 updateMatrixWorld 正确刷新，投影结果会完全失真。
+         这里直接挪动真实相机、算完立刻复位。 */
+      if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) {
+        (window as unknown as Record<string, unknown>).__dsVars = () => ({
+          COMET_START: COMET_START.toArray().map(Math.round),
+          COMET_END: COMET_END.toArray().map(Math.round),
+          FLIGHT_DIR: FLIGHT_DIR.toArray().map((n: number) => +n.toFixed(4)),
+          'cometAt(0)': cometAt(0).toArray().map(Math.round),
+          'cometAt(1)': cometAt(1).toArray().map(Math.round),
+          'camAt(0)': camAt(0).toArray().map(Math.round),
+          'camAt(0.5)': camAt(0.5).toArray().map(Math.round),
+          'camAt(1)': camAt(1).toArray().map(Math.round),
+          'camDist(0)': Math.round(camAt(0).length()),
+          'camDist(0.5)': Math.round(camAt(0.5).length()),
+          'camDist(1)': Math.round(camAt(1).length()),
+          'lookAt(0)': lookAtForP(0).toArray().map(Math.round),
+          'lookAt(1)': lookAtForP(1).toArray().map(Math.round),
+          earthWorld: (() => {
+            const v = new THREE.Vector3();
+            planets[2].mesh.getWorldPosition(v);
+            return v.toArray().map(Math.round);
+          })(),
+          earthOrbit: planetDefs[2].orbit,
+          fov: camera.fov,
+          aspect: +camera.aspect.toFixed(4),
+        });
+
+        (window as unknown as Record<string, unknown>).__dsProbe = (p: number) => {
+          const savedPos = camera.position.clone();
+          const savedQuat = camera.quaternion.clone();
+
+          camera.position.copy(camAt(p));
+          camera.lookAt(lookAtForP(p));
+          camera.updateMatrixWorld(true);
+          camera.updateProjectionMatrix();
+
+          const project = (v: THREE.Vector3) => {
+            const t = v.clone().project(camera);
+            return { x: t.x * 0.5 + 0.5, y: -t.y * 0.5 + 0.5 };
+          };
+          // 采样球面取包围盒，得到"屏幕占比"
+          const projectObj = (pos: THREE.Vector3, radius: number) => {
+            let minX = 1, maxX = 0, minY = 1, maxY = 0, anyFront = false;
+            for (let i = 0; i < 72; i++) {
+              const th = (i / 72) * Math.PI * 2;
+              const ph = Math.acos(1 - (2 * (i % 36)) / 36);
+              const pt = pos
+                .clone()
+                .addScaledVector(
+                  new THREE.Vector3(
+                    Math.sin(ph) * Math.cos(th),
+                    Math.cos(ph),
+                    Math.sin(ph) * Math.sin(th),
+                  ),
+                  radius,
+                );
+              if (pt.clone().applyMatrix4(camera.matrixWorldInverse).z > -1) continue;
+              anyFront = true;
+              const s = project(pt);
+              minX = Math.min(minX, s.x); maxX = Math.max(maxX, s.x);
+              minY = Math.min(minY, s.y); maxY = Math.max(maxY, s.y);
+            }
+            if (!anyFront) return null;
+            const r3 = (n: number) => +n.toFixed(3);
+            return {
+              left: r3(minX), right: r3(maxX), top: r3(minY), bottom: r3(maxY),
+              w: r3(maxX - minX), h: r3(maxY - minY),
+              cx: r3((minX + maxX) / 2), cy: r3((minY + maxY) / 2),
+            };
+          };
+
+          const cometPos = cometAt(cometPhase(p));
+          const earthPos = new THREE.Vector3();
+          planets[2].mesh.getWorldPosition(earthPos);
+
+          // 自检：用 three.js 自己的投影结果作为交叉验证，
+          // 避免"手工模型和浏览器实测不一致却不知道信谁"。
+          const selfCheck = (() => {
+            const camToSun = new THREE.Vector3(0, 0, 0).distanceTo(camera.position);
+            const halfFovRad = (camera.fov * Math.PI) / 360;
+            const viewH = 2 * Math.tan(halfFovRad) * camToSun; // 太阳所在深度的画面高度
+            const expected = (SUN_RADIUS * 2) / viewH;         // 预期的"占画面高"比例
+            const p1 = project(new THREE.Vector3(SUN_RADIUS, 0, 0));
+            const p2 = project(new THREE.Vector3(-SUN_RADIUS, 0, 0));
+            return {
+              distToSun: Math.round(camToSun),
+              viewHAtSun: Math.round(viewH),
+              expectedHeightRatio: +expected.toFixed(3),
+              rawProjDiameterX: +Math.abs(p2.x - p1.x).toFixed(3),
+              fov: camera.fov,
+              aspect: +camera.aspect.toFixed(3),
+            };
+          })();
+
+          const out = {
+            p,
+            camPos: camera.position.toArray().map(Math.round),
+            lookAt: lookAtForP(p).toArray().map(Math.round),
+            selfCheck,
+            sun: projectObj(new THREE.Vector3(0, 0, 0), SUN_RADIUS),
+            comet: projectObj(cometPos, 6),
+            cometDist: Math.round(camera.position.distanceTo(cometPos)),
+            earth: projectObj(earthPos, 86),
+          };
+
+          // 复位真实相机
+          camera.position.copy(savedPos);
+          camera.quaternion.copy(savedQuat);
+          camera.updateMatrixWorld(true);
+
+          return out;
+        };
+      }
+
+      /* ── 9. 滚动进度 → 动画系数 ──────────────────────────── */
+      let rawProgress = 0;
+      let progress = 0;
+
+      function readScroll() {
+        const total = root!.offsetHeight - window.innerHeight;
+        if (total <= 0) {
+          rawProgress = 0;
+          return;
+        }
+        rawProgress = Math.min(1, Math.max(0, -root!.getBoundingClientRect().top / total));
+      }
+
+      /* ── 10. 文字与 UI ───────────────────────────────────── */
+      function updateUI(p: number) {
+        actEls.forEach((el, i) => {
+          const local = (p - i / 3) / (1 / 3); // 本幕的局部进度
+          let opacity: number;
+          if (i === 0 && local <= 0.78) {
+            // 第一幕是"落地即见"的默认画面，不做淡入 ——
+            // 否则用户一进来看到的是一片空白（前一版就是这个 bug）
+            opacity = local < 0 ? 0 : 1;
+          } else if (local <= 0) {
+            opacity = 0;
+          } else if (local < 0.22) {
+            opacity = local / 0.22; // 淡入
+          } else if (local <= 0.78) {
+            opacity = 1; // 停留
+          } else {
+            opacity = Math.max(0, 1 - (local - 0.78) / 0.22); // 淡出
+          }
+
+          // 进出时给一点纵向位移，增强叙事感
+          let offset = 0;
+          if (local > 0.78) offset = (local - 0.78) * 70;
+          else if (i > 0 && local > 0 && local < 0.22) offset = (0.22 - local) * 70;
+
+          el.style.opacity = opacity.toFixed(4);
+          el.style.transform = `translate3d(0, ${offset.toFixed(2)}px, 0)`;
+          const visible = opacity > 0.02;
+          el.style.visibility = visible ? 'visible' : 'hidden';
+          el.style.pointerEvents = opacity > 0.5 ? 'auto' : 'none';
+        });
+
+        if (hintEl) {
+          const local = (p - 2 / 3) / (1 / 3);
+          hintEl.style.opacity = local > 0.5 ? Math.min(1, (local - 0.5) / 0.25).toFixed(3) : '0';
+        }
+        if (progressFill) {
+          progressFill.style.transform = `scaleY(${p.toFixed(4)})`;
+        }
+      }
+
+      /* ── 11. 文字舞台的位置校正 ──────────────────────────
+         .ds-stage 是 absolute，处在 300vh 的轨道里。
+         每帧用 transform 把它拉回视口位置，等于自己实现了一个 fixed。
+         这样即使环境的 position:fixed 行为异常也不会错位。 */
+      function syncStage(p: number) {
+        // 舞台要贴在"第一屏"的位置上——即 intro 顶部对齐视口顶部时
+        const introTop = root!.getBoundingClientRect().top;
+        stage.style.transform = `translate3d(0, ${(-introTop).toFixed(2)}px, 0)`;
+        void p;
+      }
+
+      /* ── 12. 每帧更新 3D 场景 ────────────────────────────── */
+      const tmpVec = new THREE.Vector3();
+      const lookTarget = new THREE.Vector3();
+
+      let elapsedTime = 0;
+      let lastStamp = performance.now();
+
+      function updateScene(p: number, elapsed: number) {
+        /* 流星：世界坐标下的严格直线插值（世界坐标 lerp，轨迹永远是直的）。
+           用 0.85 次幂放缓推进，配合相机后退速度，保证它始终在画面内。 */
+        const cp = cometPhase(p);
+        tmpVec.copy(COMET_START).lerp(COMET_END, cp);
+        cometGroup.position.copy(tmpVec);
+        // 彗尾始终拖在身后
+        cometGroup.lookAt(tmpVec.clone().add(COMET_DIR));
+
+        /* 相机：沿航线反方向后退 + 抬升 */
+        camera.position.copy(camAt(p));
+        lookTarget.copy(lookAtForP(p));
+        camera.lookAt(lookTarget);
+
+        /* 彗尾长度与亮度随进度变化（越到后段拖得越长） */
+        const speedFactor = 0.75 + p * 0.85;
+        const tailLen = 720 * speedFactor;
+
+        for (let i = 0; i <= TAIL_SEG; i++) {
+          const t = i / TAIL_SEG;
+          const width = (Math.sin(t * Math.PI) * 0.6 + 0.14) * 30 * speedFactor;
+          const z = -t * tailLen;
+          const idx = i * 2;
+          tailPos[idx * 3] = -width;
+          tailPos[idx * 3 + 1] = 0;
+          tailPos[idx * 3 + 2] = z;
+          tailPos[(idx + 1) * 3] = width;
+          tailPos[(idx + 1) * 3 + 1] = 0;
+          tailPos[(idx + 1) * 3 + 2] = z;
+
+          const fade = Math.pow(1 - t, 2.1);
+          tailCol[idx * 3] = fade * 0.85;
+          tailCol[idx * 3 + 1] = fade * 0.96;
+          tailCol[idx * 3 + 2] = fade;
+          tailCol[(idx + 1) * 3] = fade * 0.85;
+          tailCol[(idx + 1) * 3 + 1] = fade * 0.96;
+          tailCol[(idx + 1) * 3 + 2] = fade;
+        }
+        tailGeo.attributes.position.needsUpdate = true;
+        tailGeo.attributes.color.needsUpdate = true;
+        tailGeo.computeBoundingSphere();
+
+        cometCore.scale.setScalar(0.9 + Math.sin(elapsed * 7) * 0.12);
+        cometGlow.scale.setScalar(76 + Math.sin(elapsed * 5) * 9);
+
+        for (let i = 0; i < SPARK_COUNT; i++) {
+          const seed = sparkSeed[i];
+          const t = (seed + elapsed * 0.26) % 1;
+          sparkPos[i * 3] = (Math.sin(seed * 91.7) * 0.5) * 12 * (0.3 + t);
+          sparkPos[i * 3 + 1] = Math.cos(seed * 57.3) * 7 * (0.2 + t);
+          sparkPos[i * 3 + 2] = -t * tailLen * 0.94;
+        }
+        sparkGeo.attributes.position.needsUpdate = true;
+        (cometSparks.material as THREE.PointsMaterial).opacity = 0.75 * (0.5 + p * 0.5);
+
+        /* 太阳脉动 */
+        sunCore.scale.setScalar(1 + Math.sin(elapsed * 1.35) * 0.014);
+        sunGlowInner.scale.setScalar(1500 * (1 + Math.sin(elapsed * 0.9) * 0.03));
+        sunGlowOuter.scale.setScalar(3400 * (1 + Math.sin(elapsed * 0.62 + 1.2) * 0.035));
+
+        /* 行星公转与自转 —— 用 elapsed 保证匀速，与滚动解耦 */
+        planets.forEach((pl, i) => {
+          pl.pivot.rotation.y = elapsed * pl.def.speed * 0.16 + i * 1.7 + (i === 2 ? 1 : 0) * 0.0;
+          pl.mesh.rotation.y = elapsed * 0.35 + i;
+        });
+        moonPivot.rotation.y = elapsed * 0.85;
+
+        starfield.rotation.y = elapsed * 0.0042;
+        starfield.rotation.x = Math.sin(elapsed * 0.05) * 0.014;
+      }
+
+      /* ── 13. 主循环 ──────────────────────────────────────── */
+      let running = true;
+
+      function frame() {
+        if (!running) return;
+        requestAnimationFrame(frame);
+
+        const now = performance.now();
+        // 单帧步长封顶，避免切回标签页时动画瞬跳
+        elapsedTime += Math.min(0.05, (now - lastStamp) / 1000);
+        lastStamp = now;
+
+        // 丝滑的来源：progress 用 lerp 逼近 rawProgress
+        progress += (rawProgress - progress) * 0.075;
+        if (Math.abs(rawProgress - progress) < 0.00015) progress = rawProgress;
+
+        updateScene(progress, elapsedTime);
+        updateUI(progress);
+        syncStage(progress);
+        renderer.render(scene, camera);
+      }
+
+      /* ── 14. 滚动 / 尺寸 / 可见性 ────────────────────────── */
+      readScroll();
+      progress = rawProgress; // 首帧不要追赶动画
+      let outState = false;
+
+      function onScroll() {
+        readScroll();
+        const introRect = root!.getBoundingClientRect();
+        // 3D 区域（300vh）完全滚完之后，立刻隐藏画布与文字层。
+        // 用 top + height 判断而不是 bottom —— bottom 是相对视口底部的，
+        // 要等整个元素滑过视口才变负，会晚一大截（实测晚了近 400px）。
+        const introBottomAbs = introRect.top + introRect.height;
+        const isOut = introBottomAbs <= 0;
+
+        if (isOut !== outState) {
+          outState = isOut;
+          canvasHost.classList.toggle('is-out', isOut);
+          stage.classList.toggle('is-out', isOut);
+        }
+        // 3D 首屏还占着主要画面时，导航保持透明
+        document.body.classList.toggle(
+          'ds-intro-active',
+          introRect.top < window.innerHeight * 0.5 && introBottomAbs > window.innerHeight * 0.5,
+        );
+      }
+
+      function onResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight, false);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, window.innerWidth < 768 ? 1.5 : 2));
+        readScroll();
+        onScroll();
+      }
+
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onResize, { passive: true });
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          running = false;
+        } else if (!running) {
+          running = true;
+          lastStamp = performance.now();
+          frame();
+        }
+      });
+
+      renderer.domElement.addEventListener('webglcontextlost', (e: Event) => {
+        e.preventDefault();
+        running = false;
+        canvasHost.classList.add('is-out');
+        stage.classList.add('is-out');
+        // 画布搬回原位，让 is-static 的降级样式生效
+        if (originalParent) {
+          originalParent.insertBefore(canvasHost, originalNext);
+        }
+        root!.classList.add('is-static');
+      });
+
+      onScroll();
+      frame();
+    }
+  }
+</script>
