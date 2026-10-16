@@ -1,0 +1,1712 @@
+---
+/**
+ * 全页太阳系流星 3D 背景
+ *
+ * ─────────────────────────────────────────────────────────────
+ * 架构（与旧版「300vh 首屏」的区别）：
+ *   旧版：组件占 300vh，内部叠加三块文字浮层，滚动到那里弹卡片。
+ *   本版：3D 画布固定在最底层，作为【整页背景】贯穿整个文档；
+ *         页面一进来就是完整个人介绍，正文自上而下平铺；
+ *         整页滚动进度（0~1）映射为 3D 的三幕镜头递进。
+ *
+ *   1. 画布 position: fixed 铺满视口，永不随页面滚动位移
+ *   2. 滚动进度 = window.scrollY / (文档高 - 视口高)
+ *   3. 该系数同步驱动：流星位置、相机位置与朝向、天体显隐与缩放
+ *   4. 流星始终是世界坐标下的直线（硬要求）
+ *   5. 正文全部是普通 HTML，浮在画布之上；本组件不含任何正文内容
+ *
+ * ─────────────────────────────────────────────────────────────
+ * 分层与底色：
+ *   body 默认有不透明底色（--color-ink-950），会把 z-index:-1 的画布盖住。
+ *   本组件挂载时给 <body> 加 .ds-3d-page 类，把底色交给画布自己的渐变，
+ *   同时收掉原有 .aurora 光晕（避免与 3D 星云重复叠加）。
+ *   降级或上下文丢失时移除该类，页面回到原样。
+ *
+ * ─────────────────────────────────────────────────────────────
+ * 着色器：
+ *   太阳与地球都用原生 GLSL 程序化生成 —— 不依赖任何外部贴图，
+ *   放大后依然细腻，且没有额外网络请求。
+ */
+
+const ACTS = [
+  { key: 'sun', name: '太阳近景' },
+  { key: 'earth', name: '地月空间' },
+  { key: 'system', name: '太阳系全景' },
+];
+---
+
+<!-- 仅作为挂载点，不含任何可见内容 -->
+<div id="ds-bg" data-acts={JSON.stringify(ACTS)} aria-hidden="true"></div>
+
+<style>
+  /* ════════════════════════════════════════════════════════════
+     全部样式走 Astro scoped style（构建时自动加哈希属性），
+     物理上不可能影响原有网站的元素。
+     :global 只用于「接管页面底色」这类整体行为，
+     不改动任何既有元素的尺寸、布局或功能。
+     ════════════════════════════════════════════════════════════ */
+
+  #ds-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+    visibility: hidden;
+  }
+
+  /* ── 3D 画布层 ─────────────────────────────────────────────
+     ⚠️ 必须用 :global() —— 这个 div 是 JS 动态创建的，身上没有
+        Astro 的 scoped 哈希属性，写成普通选择器会完全匹配不上
+        （实测：position 变成 static、z-index 变成 auto，画布跟着页面滚动）。
+
+     由 JS 挂到 <body> 下（留在组件内部时，Chrome 不会把
+     position:fixed 相对视口解析 —— 这是实测确认过的坑）。
+     z-index 必须为负：WebGL canvas 会提升为独立合成层，
+     用 0 或正值时实测会盖住上层的 HTML 文字。 */
+  :global(.ds-canvas) {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    margin: 0 !important;
+    z-index: -1 !important;
+    pointer-events: none !important;
+    background:
+      radial-gradient(ellipse 130% 90% at 50% 42%, #070c16 0%, #04060c 55%, #010204 100%);
+    opacity: 1;
+    transition: opacity 0.6s ease;
+  }
+  :global(.ds-canvas canvas) {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  /* Three.js 动态导入期间的加载指示 */
+  :global(.ds-canvas::after) {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 3.2rem;
+    height: 3.2rem;
+    margin: -1.6rem 0 0 -1.6rem;
+    border-radius: 9999px;
+    border: 1.5px solid rgba(45, 212, 191, 0.18);
+    border-top-color: rgba(45, 212, 191, 0.6);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    animation: ds-spin 1.15s linear infinite;
+  }
+  :global(.ds-canvas.is-loading::after) {
+    opacity: 1;
+  }
+  @keyframes ds-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* ── 接管页面底色 ───────────────────────────────────────────
+     画布在 z-index:-1，而 body 的不透明底色会把它盖住，
+     所以由组件接管：body 透明，底色交给画布的径向渐变。
+     同时收掉原有 .aurora 顶部光晕，避免与 3D 星云重复叠加。 */
+  /* ── 页面基底（兜底）─────────────────────────────────────
+     ⚠️ 这一层是"永不白屏"的保证。
+
+     之前的设计有严重缺陷：body 底色被交给 3D 画布，一旦 3D 没启动
+     （WebGL 不可用 / three 加载失败 / 系统开了「减少动画效果」），
+     页面就是一片纯白或纯黑，访客什么都看不到。
+
+     现在改成：body 自带深空渐变 + 点阵纹理，
+     3D 画布只是叠在它上面的一层增强。3D 挂了，页面依然是完整的深空。 */
+  :global(body.ds-3d-page) {
+    background-color: #04060c;
+    background-image:
+      /* 点阵纹理：淡到几乎看不见，但能给空旷区域一点质感 */
+      radial-gradient(circle at 1px 1px, rgba(120, 160, 220, 0.05) 1px, transparent 0),
+      /* 主渐变：与画布里的渐变保持一致，所以 3D 有无都看不出接缝 */
+      radial-gradient(ellipse 130% 90% at 50% 42%, #070c16 0%, #04060c 55%, #010204 100%);
+    background-size: 34px 34px, 100% 100%;
+    background-attachment: fixed, fixed;
+  }
+  :global(body.ds-3d-page > .aurora) {
+    opacity: 0 !important;
+    transition: opacity 0.6s ease;
+  }
+
+  /* ── 正文可读性保护 ─────────────────────────────────────────
+     画布始终压在内容之下，且曝光受控（见 JS 的 toneMappingExposure）。
+     这里再加一层"阅读罩"：左上角一小片暗色渐变。
+     首屏正文集中在左上，而太阳在右下 —— 渐变只压暗需要的地方，
+     既保证文字清晰，又不动 3D 的观感。
+     其余板板块的文字自带玻璃卡片（有底色），不需要额外处理。 */
+  :global(.ds-scrim) {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    /* 强度由 JS 每帧写入 —— 它随滚动进度减弱。
+       为什么必须动态：这层是为【首幕太阳近景】调的强度（那时画面里
+       有一个占满右侧的巨大亮源，必须压住才能读字）。但同一强度压到
+       页脚就过暗了（实测页脚平均亮度仅 11，而首幕 16.6，明显发闷）。
+
+       实测依据：把这一层关掉后页脚亮度从 11.1 回到 17.4，而画布本身
+       （星空 + 行星）亮度是足够的 —— 说明问题在这层的固定强度，
+       不在 3D 场景。 */
+    opacity: var(--ds-scrim-opacity, 1);
+    background:
+      /* 中部暗化：正文满宽，天体会从中间掠过，这一层是文字可读性的主力 */
+      radial-gradient(
+        ellipse 96% 82% at 50% 52%,
+        rgba(3, 6, 12, 0.60) 0%,
+        rgba(3, 6, 12, 0.52) 42%,
+        rgba(3, 6, 12, 0.26) 68%,
+        rgba(3, 6, 12, 0) 88%
+      ),
+      /* 四周暗角：收拢视觉焦点。
+         强度从 0.40 降到 0.24 —— 页脚正好落在暗角最重的区域，
+         0.40 时把整块内容压得发闷。 */
+      radial-gradient(
+        ellipse 122% 112% at 50% 50%,
+        rgba(0, 0, 0, 0) 52%,
+        rgba(0, 0, 0, 0.24) 100%
+      );
+  }
+
+  :global(body.ds-3d-page main) {
+    position: relative;
+    z-index: 1;
+  }
+  :global(body.ds-3d-page header#site-nav) {
+    z-index: 40;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ds-canvas::after {
+      animation: none;
+    }
+  }
+</style>
+
+<script>
+  /**
+   * Three.js 用「动态导入 + 仅类型导入」：
+   *   import type 只服务类型检查，编译后被完全擦除，零体积
+   *   await import() 运行时才加载，Vite 会拆成独立 chunk
+   * 于是首屏 HTML/CSS/正文文字立刻可读，3D 在后台并行加载。
+   */
+  import type * as THREE from 'three';
+
+  /* ── 真实行星贴图 ─────────────────────────────────────────
+     来源：Solar System Scope（solarsystemscope.com/textures）
+     基于 NASA 高程与影像数据，CC BY 4.0 授权，可商用。
+     地球日面图是关键 —— 程序化噪声只能生成"看起来合理"的假大陆，
+     不可能长出真实的非洲大陆与马达加斯加。
+
+     Astro 会在构建时把这些图处理成带哈希的静态资源，
+     所以下面 import 得到的是最终 URL 字符串。 */
+  import earthDayUrl from '../assets/textures/earth_day.jpg';
+  import earthCloudsUrl from '../assets/textures/earth_clouds.jpg';
+  import earthLightsUrl from '../assets/textures/earth_lights.png';
+  import moonMapUrl from '../assets/textures/moon.jpg';
+
+  const host = document.getElementById('ds-bg');
+
+  if (host) {
+    /* ── 无条件接管页面底色 ────────────────────────────────
+       这一步必须在最前面、且不依赖任何条件分支 ——
+       它同时承担两个职责：
+         1. 让 3D 画布（z-index:-1）能透出来
+         2. 3D 没启动时作为兜底背景，保证页面永不空白
+       所以哪怕 WebGL 不可用、three 加载失败、用户开了
+       「减少动画效果」，这一行都已经执行过了。 */
+    document.body.classList.add('ds-3d-page');
+
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    let webglOK = false;
+    let webglWhy = '';
+    try {
+      const probe = document.createElement('canvas');
+      const gl2 = probe.getContext('webgl2');
+      const gl1 = gl2 ? null : probe.getContext('webgl');
+      webglOK = !!(window.WebGLRenderingContext && (gl2 || gl1));
+      if (!webglOK) webglWhy = 'no-webgl-context';
+    } catch (e) {
+      webglOK = false;
+      webglWhy = 'webgl-probe-threw';
+    }
+
+    /* 降级原因写到 body 的 data 属性上 —— 出问题时能在
+       控制台一眼看出走的是哪条路径，不用猜。 */
+    const reason = !webglOK ? webglWhy : (reduceMotion ? 'reduced-motion' : '');
+    if (reason) {
+      document.body.dataset.dsFallback = reason;
+      // 注意：不要用 %s 占位符 —— console 会原样打出 %s 而不是替换。
+      console.info(
+        '[ds-bg] 3D 背景未启动（原因：' + reason + '），' +
+        '已使用静态深空背景，页面内容不受影响。',
+      );
+    } else {
+      import('three')
+        .then((THREE) => {
+          /* boot 内部可能因为任何原因抛错（显卡驱动怪异、
+             着色器编译失败、three 版本行为变化…）。
+             这里兜住它 —— 兜底背景早已生效，所以最坏情况只是
+             "没有 3D"，绝不会白屏或中断后续脚本。 */
+          try {
+            boot(THREE);
+          } catch (err) {
+            document.body.dataset.dsFallback = 'boot-failed';
+            console.warn('[ds-bg] 3D 场景初始化失败，已退回静态深空背景', err);
+          }
+        })
+        .catch((err) => {
+          // three 加载失败：兜底背景已经在生效（.ds-3d-page 早已加上），
+          // 这里只记录原因，页面完全不受影响。
+          document.body.dataset.dsFallback = 'three-load-failed';
+          console.warn('[ds-bg] Three.js 加载失败，已退回静态深空背景', err);
+        });
+    }
+
+    /* ════════════════════════════════════════════════════════
+       主逻辑
+       ════════════════════════════════════════════════════════ */
+    function boot(THREE: typeof import('three')): void {
+      const LOW = window.matchMedia('(max-width: 767px)').matches;
+
+      /* ── 0. 画布层挂到 <body> 下，并接管页面底色 ─────────── */
+      const canvasHost = document.createElement('div');
+      canvasHost.className = 'ds-canvas';
+      document.body.appendChild(canvasHost);
+
+      // 阅读罩：叠在画布之上、正文之下，压暗正文区域，保证文字清晰可读。
+      // 强度随滚动进度动态减弱 —— 首幕有一个占满右侧的巨大亮源需要压住，
+      // 但同一个强度压到页脚就太闷了（实测依据见样式里的注释）。
+      const scrim = document.createElement('div');
+      scrim.className = 'ds-scrim';
+
+      /* ── 阅读罩强度：滚动进度 -> opacity ──────────────────────
+       *
+       * 为什么必须分两段：
+       *   实测「刷新瞬间文字是亮的，加载完成后立刻变暗」（用户反馈）。
+       *   根因是这层罩子 —— 它在 three 加载完成后才被创建并挂到 body 上，
+       *   而挂上的一刻就带着当时的强度。所以"先亮后暗"是元素被创建的瞬间
+       *   造成的，与动画无关（已逐项排除 tilt-in / reveal / 全局动画）。
+       *
+       *   逐层剥离实测（藏掉某层后联系板块文字均值的提升）：
+       *     藏阅读罩      +33.6  <<< 就是它
+       *     藏 3D 画布    +6.5
+       *     去 tilt 旋转   +0.1
+       *     去 reveal      +0.2
+       *     停所有动画      +0.0
+       *   又做了单调性验证（固定滚动位置只改 opacity）：
+       *     op=1.0 -> 文字 88.4     op=0.554 -> 117.5
+       *     op=0.15 -> 141.8        op=0   -> 150.3
+       *   完全单调，因果确定。
+       *
+       * 分两段处理：
+       *   第一段 0~0.62：保持原有的 1.0 -> 0.55 缓降。
+       *     这一段画面上有太阳近景等巨大亮源从正文后方经过，
+       *     罩子是文字可读性的保障，不能动。
+       *   第二段 0.62~0.88：降到 0。
+       *     联系板块（页面最底部）在这个区间进入视口，
+       *     而那里已经没有任何亮源经过，罩子只剩"白白压暗文字"的副作用。
+       *     实测降到 0 后文字回到 150.3，与刷新瞬间的亮度一致。 */
+      const scrimOpacityFor = (p: number) => {
+        const t = Math.min(1, Math.max(0, p));
+        if (t <= 0.62) return 1 - (0.45 * t) / 0.62;
+        const k = Math.min(1, (t - 0.62) / 0.26);
+        const smooth = k * k * (3 - 2 * k);
+        return 0.55 * (1 - smooth);
+      };
+
+      /* ⚠️ 必须在 append 之前就把强度算好。
+         否则它挂上 DOM 的第一帧会落回 CSS 兜底值 opacity:1（最暗），
+         等动画循环跑起来才被改成正确值 —— 那又是一次可见的闪烁。
+         这正是"先亮后暗"的成因模式：元素带着错误的初始状态出现。
+         这里先读一次真实滚动位置，用最终公式算出该有的强度再挂载。 */
+      readScroll();
+      scrim.style.setProperty(
+        '--ds-scrim-opacity',
+        scrimOpacityFor(rawProgress).toFixed(3),
+      );
+      document.body.appendChild(scrim);
+
+      /* ── 1. 渲染器 ───────────────────────────────────────── */
+      const renderer = new THREE.WebGLRenderer({
+        antialias: !LOW,
+        alpha: true,
+        powerPreference: 'high-performance',
+      });
+      let pixelRatio = Math.min(window.devicePixelRatio, LOW ? 1.5 : 2);
+      renderer.setPixelRatio(pixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight, false);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      // 曝光压低：3D 是背景，不能抢正文的视觉焦点
+      renderer.toneMappingExposure = 0.70;
+      renderer.domElement.style.pointerEvents = 'none';
+      canvasHost.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x04060c, 0.000026);
+
+      const camera = new THREE.PerspectiveCamera(
+        52,
+        window.innerWidth / window.innerHeight,
+        1,
+        90000,
+      );
+
+      /* ══════════════════════════════════════════════════════
+         2. 公用噪声 —— 太阳/地球着色器共用
+         3D 值噪声 + fbm，纯 GLSL、无外部依赖
+         ══════════════════════════════════════════════════════ */
+      const NOISE_GLSL = /* glsl */ `
+        float dsHash(vec3 p) {
+          p = fract(p * 0.3183099 + vec3(0.1, 0.2, 0.3));
+          p *= 17.0;
+          return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+        }
+        float dsNoise(vec3 x) {
+          vec3 i = floor(x);
+          vec3 f = fract(x);
+          f = f * f * (3.0 - 2.0 * f);
+          return mix(
+            mix(mix(dsHash(i + vec3(0.0, 0.0, 0.0)), dsHash(i + vec3(1.0, 0.0, 0.0)), f.x),
+                mix(dsHash(i + vec3(0.0, 1.0, 0.0)), dsHash(i + vec3(1.0, 1.0, 0.0)), f.x), f.y),
+            mix(mix(dsHash(i + vec3(0.0, 0.0, 1.0)), dsHash(i + vec3(1.0, 0.0, 1.0)), f.x),
+                mix(dsHash(i + vec3(0.0, 1.0, 1.0)), dsHash(i + vec3(1.0, 1.0, 1.0)), f.x), f.y),
+            f.z);
+        }
+        float dsFbm(vec3 p, int oct) {
+          float a = 0.5, s = 0.0, n = 0.0;
+          for (int i = 0; i < 6; i++) {
+            if (i >= oct) break;
+            s += a * dsNoise(p);
+            n += a;
+            a *= 0.5;
+            p *= 2.03;
+          }
+          return s / max(n, 1e-4);
+        }
+        // 脊状噪声：制造丝状、纤维状的细节（太阳的细颗粒 / 星云丝絮）
+        float dsRidge(vec3 p, int oct) {
+          float a = 0.5, s = 0.0, n = 0.0;
+          for (int i = 0; i < 6; i++) {
+            if (i >= oct) break;
+            float v = 1.0 - abs(dsNoise(p) * 2.0 - 1.0);
+            s += a * v * v;
+            n += a;
+            a *= 0.5;
+            p *= 2.07;
+          }
+          return s / max(n, 1e-4);
+        }
+      `;
+
+      /* ══════════════════════════════════════════════════════
+         3. 程序化贴图工具
+         ══════════════════════════════════════════════════════ */
+      function makeSoftSprite(inner: string, mid: string, size = 256): THREE.Texture {
+        const cv = document.createElement('canvas');
+        cv.width = cv.height = size;
+        const ctx = cv.getContext('2d')!;
+        const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+        g.addColorStop(0, inner);
+        g.addColorStop(0.4, mid);
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, size, size);
+        const t = new THREE.CanvasTexture(cv);
+        t.colorSpace = THREE.SRGBColorSpace;
+        return t;
+      }
+
+      /**
+       * 十字光芒贴图：中心亮点 + 八条放射光芒。
+       * 用来给少数亮星做"星芒"效果 —— 深空照片里很典型的点缀。
+       */
+      function makeSparkleTexture(size = 128): THREE.Texture {
+        const cv = document.createElement('canvas');
+        cv.width = cv.height = size;
+        const ctx = cv.getContext('2d')!;
+        const c = size / 2;
+
+        // 中心柔核
+        const g = ctx.createRadialGradient(c, c, 0, c, c, c * 0.42);
+        g.addColorStop(0, 'rgba(255,255,255,1)');
+        g.addColorStop(0.5, 'rgba(214,238,255,0.55)');
+        g.addColorStop(1, 'rgba(150,200,255,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, size, size);
+
+        // 放射光芒：细长线性渐变
+        ctx.globalCompositeOperation = 'lighter';
+        const ray = (x0: number, y0: number, x1: number, y1: number, w: number, a: number) => {
+          const lg = ctx.createLinearGradient(x0, y0, x1, y1);
+          lg.addColorStop(0, 'rgba(255,255,255,' + a + ')');
+          lg.addColorStop(0.35, 'rgba(200,230,255,' + a * 0.28 + ')');
+          lg.addColorStop(1, 'rgba(150,200,255,0)');
+          ctx.strokeStyle = lg;
+          ctx.lineWidth = w;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(x0, y0);
+          ctx.lineTo(x1, y1);
+          ctx.stroke();
+        };
+        ray(c, c, size, c, 1.6, 0.95);
+        ray(c, c, 0, c, 1.6, 0.95);
+        ray(c, c, c, 0, 1.6, 0.95);
+        ray(c, c, c, size, 1.6, 0.95);
+        ray(c, c, size * 0.86, size * 0.14, 1.0, 0.45);
+        ray(c, c, size * 0.14, size * 0.86, 1.0, 0.45);
+        ray(c, c, size * 0.14, size * 0.14, 1.0, 0.45);
+        ray(c, c, size * 0.86, size * 0.86, 1.0, 0.45);
+        ctx.globalCompositeOperation = 'source-over';
+
+        const t = new THREE.CanvasTexture(cv);
+        t.colorSpace = THREE.SRGBColorSpace;
+        return t;
+      }
+
+      /** 星云贴图：径向衰减 × fbm 阈值，形成丝絮状而非圆斑 */
+      function makeNebulaTexture(size = 512): THREE.Texture {
+        const cv = document.createElement('canvas');
+        cv.width = cv.height = size;
+        const ctx = cv.getContext('2d')!;
+        const img = ctx.createImageData(size, size);
+        const d = img.data;
+
+        const perm = new Uint8Array(512);
+        for (let i = 0; i < 256; i++) perm[i] = i;
+        for (let i = 255; i > 0; i--) {
+          const j = (Math.random() * (i + 1)) | 0;
+          const t = perm[i]; perm[i] = perm[j]; perm[j] = t;
+        }
+        for (let i = 0; i < 256; i++) perm[i + 256] = perm[i];
+        const h2 = (x: number, y: number) => perm[(perm[x & 255] + (y & 255)) & 511] / 255;
+        const n2 = (x: number, y: number) => {
+          const xi = Math.floor(x), yi = Math.floor(y);
+          const xf = x - xi, yf = y - yi;
+          const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+          return (h2(xi, yi) * (1 - u) + h2(xi + 1, yi) * u) * (1 - v) +
+                 (h2(xi, yi + 1) * (1 - u) + h2(xi + 1, yi + 1) * u) * v;
+        };
+        const fbm2 = (x: number, y: number) => {
+          let a = 0.5, s = 0, n = 0;
+          for (let o = 0; o < 5; o++) {
+            s += a * n2(x, y);
+            n += a;
+            a *= 0.5;
+            x *= 2.07; y *= 2.03;
+          }
+          return s / n;
+        };
+
+        for (let y = 0; y < size; y++) {
+          for (let x = 0; x < size; x++) {
+            const i = (y * size + x) * 4;
+            const nx = x / size, ny = y / size;
+            const dx = nx - 0.5, dy = ny - 0.5;
+            const rad = Math.sqrt(dx * dx + dy * dy) * 2;
+            const falloff = Math.max(0, 1 - rad);
+            const cloud = fbm2(nx * 4.5, ny * 4.5);
+            const a = Math.pow(Math.max(0, cloud - 0.42) / 0.58, 1.7) *
+                      Math.pow(falloff, 1.35);
+            d[i] = 255;
+            d[i + 1] = 255;
+            d[i + 2] = 255;
+            d[i + 3] = Math.min(255, a * 235);
+          }
+        }
+        ctx.putImageData(img, 0, 0);
+        const t = new THREE.CanvasTexture(cv);
+        t.colorSpace = THREE.SRGBColorSpace;
+        return t;
+      }
+
+      /* ══════════════════════════════════════════════════════
+         4. 星场 —— 两级 + 顶点着色器闪烁
+         单个 Points 一次 draw call，闪烁在 GPU 上算
+         ══════════════════════════════════════════════════════ */
+      const starUniforms = {
+        uTime: { value: 0 },
+        uPixelRatio: { value: pixelRatio },
+      };
+
+      const STAR_VERT = /* glsl */ `
+        attribute float aSize;
+        attribute float aPhase;
+        attribute vec3 aColor;
+        uniform float uTime;
+        uniform float uPixelRatio;
+        varying vec3 vColor;
+        varying float vTwinkle;
+        void main() {
+          vColor = aColor;
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          // 不同相位、不同频率的克制闪烁
+          vTwinkle = 0.70 + 0.30 * sin(uTime * (0.4 + fract(aPhase) * 0.85) + aPhase);
+          gl_Position = projectionMatrix * mv;
+          gl_PointSize = aSize * uPixelRatio * (330.0 / max(-mv.z, 1.0));
+        }
+      `;
+
+      const STAR_FRAG = /* glsl */ `
+        varying vec3 vColor;
+        varying float vTwinkle;
+        void main() {
+          vec2 d = gl_PointCoord - 0.5;
+          float r = length(d);
+          if (r > 0.5) discard;
+          float a = smoothstep(0.5, 0.05, r);
+          gl_FragColor = vec4(vColor * vTwinkle, a * vTwinkle);
+        }
+      `;
+
+      function buildStars(count: number, rMin: number, rMax: number, sMin: number, sMax: number) {
+        const pos = new Float32Array(count * 3);
+        const col = new Float32Array(count * 3);
+        const siz = new Float32Array(count);
+        const pha = new Float32Array(count);
+        const c = new THREE.Color();
+
+        for (let i = 0; i < count; i++) {
+          // 球壳分布，y 压扁让星空更贴合黄道面观感
+          const r = rMin + Math.random() * (rMax - rMin);
+          const th = Math.random() * Math.PI * 2;
+          const ph = Math.acos(2 * Math.random() - 1);
+          pos[i * 3] = r * Math.sin(ph) * Math.cos(th);
+          pos[i * 3 + 1] = r * Math.cos(ph) * 0.68;
+          pos[i * 3 + 2] = r * Math.sin(ph) * Math.sin(th);
+
+          // 冷色为主 + 少量暖色，亮度深浅错落
+          const warm = Math.random() < 0.14;
+          c.setHSL(
+            warm ? 0.08 + Math.random() * 0.06 : 0.54 + Math.random() * 0.14,
+            warm ? 0.55 : 0.28 + Math.random() * 0.34,
+            0.55 + Math.random() * 0.42,
+          );
+          col[i * 3] = c.r;
+          col[i * 3 + 1] = c.g;
+          col[i * 3 + 2] = c.b;
+
+          siz[i] = sMin + Math.pow(Math.random(), 2.4) * (sMax - sMin);
+          pha[i] = Math.random() * Math.PI * 2;
+        }
+
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        geo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
+        geo.setAttribute('aSize', new THREE.BufferAttribute(siz, 1));
+        geo.setAttribute('aPhase', new THREE.BufferAttribute(pha, 1));
+
+        const pts = new THREE.Points(
+          geo,
+          new THREE.ShaderMaterial({
+            uniforms: starUniforms,
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+            fog: false,
+            vertexShader: STAR_VERT,
+            fragmentShader: STAR_FRAG,
+          }),
+        );
+        pts.frustumCulled = false;
+        return pts;
+      }
+
+      const starsFar = buildStars(LOW ? 3400 : 7200, 4000, 30000, 0.8, 2.4);
+      const starsNear = buildStars(LOW ? 900 : 2000, 1200, 9000, 1.6, 4.6);
+      scene.add(starsFar, starsNear);
+
+      /* 微光点缀：带十字光芒的亮星。
+         数量刻意压得很少 —— 星芒是"点缀"，多了会显得花。 */
+      {
+        const count = LOW ? 40 : 90;
+        const pos = new Float32Array(count * 3);
+        const col = new Float32Array(count * 3);
+        const siz = new Float32Array(count);
+        const pha = new Float32Array(count);
+        const c = new THREE.Color();
+        for (let i = 0; i < count; i++) {
+          const r = 3000 + Math.random() * 22000;
+          const th = Math.random() * Math.PI * 2;
+          const ph = Math.acos(2 * Math.random() - 1);
+          pos[i * 3] = r * Math.sin(ph) * Math.cos(th);
+          pos[i * 3 + 1] = r * Math.cos(ph) * 0.7;
+          pos[i * 3 + 2] = r * Math.sin(ph) * Math.sin(th);
+          // 亮星偏冷白，掺一点暖色
+          const warm = Math.random() < 0.22;
+          c.setHSL(warm ? 0.09 + Math.random() * 0.05 : 0.55 + Math.random() * 0.1,
+                   0.35, 0.86 + Math.random() * 0.14);
+          col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
+          siz[i] = 26 + Math.random() * 46;
+          pha[i] = Math.random() * Math.PI * 2;
+        }
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        g.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
+        g.setAttribute('aSize', new THREE.BufferAttribute(siz, 1));
+        g.setAttribute('aPhase', new THREE.BufferAttribute(pha, 1));
+
+        /* 用 PointsMaterial + 星芒贴图，比自写着色器更简单可靠
+           （贴图已经自带十字光芒，不需要在着色器里画） */
+        const sparkles = new THREE.Points(
+          g,
+          new THREE.PointsMaterial({
+            size: 260,
+            sizeAttenuation: true,
+            vertexColors: true,
+            map: makeSparkleTexture(128),
+            transparent: true,
+            opacity: 0.85,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+            fog: false,
+          }),
+        );
+        sparkles.frustumCulled = false;
+        scene.add(sparkles);
+        var sparkleField = sparkles;
+      }
+
+      /* ══════════════════════════════════════════════════════
+         5. 星云 + 星际尘埃
+         ══════════════════════════════════════════════════════ */
+      const nebulaTex = makeNebulaTexture(LOW ? 384 : 512);
+      /* 第二张更"丝絮"的贴图：旋转 180° 使用，避免所有云絮纹理重复 */
+      const nebulaTex2 = makeNebulaTexture(LOW ? 384 : 512);
+      const nebulaGroup = new THREE.Group();
+      /** 记录每片星云的基准参数，用于缓慢呼吸与漂移 */
+      const nebulaBases: { sp: THREE.Sprite; base: number; phase: number }[] = [];
+      {
+        const defs = [
+          // r=半径 a=方位角 c=颜色 s=尺寸 o=不透明度 tex=用哪张贴图
+          { r: 8500, a: 0.5, c: 0x2a4a7a, s: 12000, o: 0.30, tex: 0 },
+          { r: 9500, a: 3.6, c: 0x1f4f5e, s: 9000, o: 0.20, tex: 1 },
+          { r: 13000, a: 2.3, c: 0x4a2f6a, s: 15000, o: 0.26, tex: 0 },
+          { r: 15500, a: 5.1, c: 0x24406b, s: 12500, o: 0.18, tex: 1 },
+          { r: 17500, a: 3.9, c: 0x1f4f5e, s: 17000, o: 0.22, tex: 0 },
+          { r: 20000, a: 0.9, c: 0x53305a, s: 15000, o: 0.15, tex: 1 },
+          { r: 25000, a: 3.1, c: 0x2f3f6a, s: 21000, o: 0.15, tex: 1 },
+          // 中央尘埃带：横贯黄道面，给盘面加一层体积感
+          { r: 6500, a: 1.9, c: 0x3d4a72, s: 20000, o: 0.11, tex: 1 },
+
+          /* ── 五彩尘埃云 ─────────────────────────────────────
+             上面那组偏冷（深蓝/紫/青），层次够但缺"斑斓"感。
+             这一组用暖色与高饱和色相，与冷色交错叠出冷暖对比。
+             不透明度刻意压低（0.06~0.13）—— 星云是氛围，
+             太浓会盖过星空细节，也会影响正文可读性。 */
+          { r: 7000, a: 0.35, c: 0xd97a2a, s: 9500, o: 0.13, tex: 0 },  // 橙金
+          { r: 8800, a: 2.75, c: 0xc23c7a, s: 10500, o: 0.10, tex: 1 }, // 品红
+          { r: 11000, a: 1.15, c: 0x1f8f86, s: 12000, o: 0.10, tex: 1 }, // 青绿
+          { r: 12500, a: 4.35, c: 0x8a4bd4, s: 11000, o: 0.09, tex: 0 }, // 紫罗兰
+          { r: 14500, a: 5.85, c: 0x2f6fd0, s: 13500, o: 0.09, tex: 1 }, // 靛蓝
+          { r: 16500, a: 0.95, c: 0xe0a63c, s: 12000, o: 0.07, tex: 0 }, // 琥珀
+          { r: 19000, a: 3.25, c: 0xbe4a5e, s: 15000, o: 0.085, tex: 1 }, // 玫瑰红
+          { r: 22000, a: 5.05, c: 0x3ab0a8, s: 17000, o: 0.08, tex: 1 }, // 湖蓝绿
+        ];
+        defs.forEach((d, i) => {
+          const sp = new THREE.Sprite(
+            new THREE.SpriteMaterial({
+              map: d.tex === 0 ? nebulaTex : nebulaTex2,
+              color: d.c,
+              transparent: true,
+              opacity: d.o,
+              depthWrite: false,
+              blending: THREE.AdditiveBlending,
+              fog: false,
+            }),
+          );
+          sp.position.set(
+            Math.cos(d.a) * d.r,
+            (Math.random() - 0.5) * 4600 - 700,
+            Math.sin(d.a) * d.r,
+          );
+          sp.scale.setScalar(d.s);
+          sp.material.rotation = (i * 1.37) % (Math.PI * 2);
+          nebulaGroup.add(sp);
+          nebulaBases.push({ sp, base: d.o, phase: i * 0.9 });
+        });
+      }
+      scene.add(nebulaGroup);
+
+      /** 星际尘埃：贴着黄道面的扁平粒子带，营造盘面厚度 */
+      const dustCount = LOW ? 1400 : 3800;
+      const dustField = (() => {
+        const pos = new Float32Array(dustCount * 3);
+        const col = new Float32Array(dustCount * 3);
+        const siz = new Float32Array(dustCount);
+        const pha = new Float32Array(dustCount);
+        const c = new THREE.Color();
+        for (let i = 0; i < dustCount; i++) {
+          const r = 1500 + Math.pow(Math.random(), 0.65) * 20000;
+          const a = Math.random() * Math.PI * 2;
+          pos[i * 3] = Math.cos(a) * r;
+          pos[i * 3 + 1] = (Math.random() - 0.5) * (200 + r * 0.055);
+          pos[i * 3 + 2] = Math.sin(a) * r;
+          c.setHSL(0.56 + Math.random() * 0.1, 0.4, 0.34 + Math.random() * 0.26);
+          col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
+          siz[i] = 1.2 + Math.random() * 3.6;
+          pha[i] = Math.random() * Math.PI * 2;
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        geo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
+        geo.setAttribute('aSize', new THREE.BufferAttribute(siz, 1));
+        geo.setAttribute('aPhase', new THREE.BufferAttribute(pha, 1));
+        const pts = new THREE.Points(
+          geo,
+          new THREE.ShaderMaterial({
+            uniforms: starUniforms,
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+            fog: false,
+            vertexShader: /* glsl */ `
+              attribute float aSize;
+              attribute float aPhase;
+              attribute vec3 aColor;
+              uniform float uTime;
+              uniform float uPixelRatio;
+              varying vec3 vColor;
+              varying float vFade;
+              void main() {
+                vColor = aColor;
+                vec4 mv = modelViewMatrix * vec4(position, 1.0);
+                vFade = 0.55 + 0.45 * sin(uTime * 0.2 + aPhase);
+                gl_Position = projectionMatrix * mv;
+                gl_PointSize = aSize * uPixelRatio * (310.0 / max(-mv.z, 1.0));
+              }
+            `,
+            fragmentShader: /* glsl */ `
+              varying vec3 vColor;
+              varying float vFade;
+              void main() {
+                vec2 d = gl_PointCoord - 0.5;
+                float r = length(d);
+                if (r > 0.5) discard;
+                gl_FragColor = vec4(vColor, smoothstep(0.5, 0.0, r) * 0.45 * vFade);
+              }
+            `,
+          }),
+        );
+        pts.frustumCulled = false;
+        return pts;
+      })();
+      scene.add(dustField);
+
+      /* ══════════════════════════════════════════════════════
+         6. 太阳 —— 贴图管表面，几何管日冕
+
+         为什么这样分工：
+           · 表面细节（米粒组织、亮斑）用真实观测贴图最像
+           · 参考图那种"丝状喷流"是日冕结构，贴图很难表达，
+             改用「多层壳体 + 辐条 + 羽流噪声」在几何上做
+         ══════════════════════════════════════════════════════ */
+      const SUN_R = 420;
+
+      /** 一次性创建贴图，供太阳与行星复用。
+       *
+       *  注意：Astro 5 里 `import img from './x.jpg'` 得到的是
+       *  ImageMetadata 对象（{ src, width, height, format }），不是字符串。
+       *  构建时会输出成带哈希的静态资源，取 .src 才是最终 URL。
+       *  这里兼容两种形态，避免以后升级 Astro 又要改。 */
+      function loadTex(
+        source: string | { src: string },
+        srgb = true,
+      ): THREE.Texture {
+        const url = typeof source === 'string' ? source : source.src;
+        const t = new THREE.TextureLoader().load(url);
+        if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+        t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        t.wrapS = THREE.RepeatWrapping;
+        return t;
+      }
+
+      const sunUniforms = {
+        uTime: { value: 0 },
+        uBrightness: { value: 0.82 },
+      };
+
+      const sunCore = new THREE.Mesh(
+        new THREE.SphereGeometry(SUN_R, 96, 64),
+        new THREE.ShaderMaterial({
+          uniforms: sunUniforms,
+          fog: false,
+          vertexShader: /* glsl */ `
+            varying vec2 vUv;
+            varying vec3 vObjPos;
+            varying vec3 vNormalW;
+            varying vec3 vViewDirW;
+            void main() {
+              vUv = uv;
+              vObjPos = position;
+              vec4 worldPos = modelMatrix * vec4(position, 1.0);
+              vNormalW = normalize(mat3(modelMatrix) * normal);
+              vViewDirW = normalize(cameraPosition - worldPos.xyz);
+              gl_Position = projectionMatrix * viewMatrix * worldPos;
+            }
+          `,
+          fragmentShader: /* glsl */ `
+            precision highp float;
+            varying vec2 vUv;
+            varying vec3 vObjPos;
+            varying vec3 vNormalW;
+            varying vec3 vViewDirW;
+            uniform float uTime;
+            uniform float uBrightness;
+
+            ${NOISE_GLSL}
+
+            void main() {
+              vec3 n = normalize(vObjPos);
+              float fres = 1.0 - clamp(dot(normalize(vNormalW), normalize(vViewDirW)), 0.0, 1.0);
+
+              /* ── 米粒组织（granulation）──
+                 太阳表面是无数对流元胞，胞界比胞心暗。
+                 用脊状噪声的反相画胞界，比单纯 fbm 更像真太阳。 */
+              float g1 = dsFbm(n * 5.5 + vec3(0.0, uTime * 0.020, 0.0), 4);
+              float g2 = dsFbm(n * 13.0 - vec3(uTime * 0.015, 0.0, uTime * 0.010), 3);
+              float cells = dsRidge(n * 26.0 + vec3(uTime * 0.010, 0.0, 0.0), 2);
+              float granule = (g1 * 0.60 + g2 * 0.30) * (1.0 - cells * 0.32);
+
+              /* 大尺度对流：让表面明暗真的在流动（贴图是静态的，
+                 不留神会显得"贴了张皮"，这层流动就是解药） */
+              float flow = dsFbm(n * 2.1 + vec3(uTime * 0.045, uTime * 0.028, 0.0), 3);
+              float heat = clamp(granule * 0.74 + flow * 0.46, 0.0, 1.0);
+
+              /* 色温分层：核心白热 -> 亮黄 -> 金橙 -> 边缘深橙红。
+                 这是反复试下来观感最好的一版 —— 贴图方案实测会出现
+                 同心环与条纹伪影，不如纯噪声干净。 */
+              vec3 deep   = vec3(0.88, 0.20, 0.015);
+              vec3 mid    = vec3(1.00, 0.55, 0.08);
+              vec3 bright = vec3(1.00, 0.86, 0.52);
+              vec3 hot    = vec3(1.00, 0.99, 0.95);
+              vec3 col = mix(deep, mid, smoothstep(0.08, 0.50, heat));
+              col = mix(col, bright, smoothstep(0.46, 0.80, heat));
+              col = mix(col, hot, smoothstep(0.78, 1.0, heat));
+
+              /* ── 黑子：暗区 + 半影环 ── */
+              float spotField = dsFbm(n * 3.3 + vec3(uTime * 0.006, 41.0, 0.0), 3);
+              float spot = smoothstep(0.62, 0.78, spotField);
+              float penumbra = smoothstep(0.58, 0.66, spotField) * (1.0 - spot);
+              col = mix(col, col * 0.30, spot * 0.85);
+              col = mix(col, col * 0.74, penumbra * 0.5);
+
+              /* ── 耀斑：黑子附近的亮斑 ── */
+              float flare = dsRidge(n * 8.5 + vec3(0.0, uTime * 0.03, uTime * 0.02), 2);
+              col += vec3(1.0, 0.74, 0.32) * smoothstep(0.72, 0.96, flare) * spot * 0.95;
+
+              /* ── 临边昏暗（真实恒星大气的必然现象） ── */
+              col *= mix(1.0, 0.68, pow(fres, 1.25));
+
+              /* ── 边缘白炽环：参考图最显著的特征 ──
+                 球体边缘一圈极亮的白热光，把太阳"框"出来，
+                 再叠一层暖橙过渡，与日冕壳体衔接。 */
+              /* 强度经过实测调整：1.6 时边缘会被推到纯白，
+                 整个球面看起来是一块平的浅色圆盘，颗粒感全丢。 */
+              col += vec3(1.0, 0.97, 0.90) * pow(fres, 3.2) * 0.95;
+              col += vec3(1.0, 0.62, 0.20) * pow(fres, 1.7) * 0.32;
+
+              // 热辐射感
+              col += vec3(0.18, 0.10, 0.03) * pow(heat, 3.0);
+
+              gl_FragColor = vec4(col * uBrightness, 1.0);
+            }
+          `,
+        }),
+      );
+
+      const sunGroup = new THREE.Group();
+      /* 太阳本体必须先绘制并写入深度缓冲 —— 否则日冕壳体
+         （depthWrite:false，不写深度）会反过来被本体遮挡，
+         在画面上形成一圈圈同心环（实测踩过的坑）。 */
+      sunCore.renderOrder = 1;
+      sunGroup.add(sunCore);
+
+      /* ── 外层柔光：三层由内到外逐层变淡变大 ──
+         为什么不用球壳做日冕：实测球壳在 fresnel 意义上是"整个球面
+         都在发光"的圆盘，会与本体形成明显可见的同心边界（试了
+         BackSide / FrontSide / 加 alpha 三种写法都不理想）。
+         Sprite 柔光的强度曲线是连续的，不会有硬边界，成本也更低。
+
+         强度刻意压低：太阳本体已经足够亮，外层只是"照亮周围空间"。 */
+      /* 半径与强度都经过实测：内层原来放到 3.0 倍时，
+         它从边缘就开始加色，把边缘又叠白了一层。 */
+      const HALO_LAYERS = [
+        { s: SUN_R * 2.3, i: 'rgba(255,220,160,0.19)', m: 'rgba(255,144,44,0.08)' },
+        { s: SUN_R * 4.6, i: 'rgba(255,190,104,0.12)', m: 'rgba(255,112,24,0.05)' },
+        { s: SUN_R * 8.5, i: 'rgba(255,158,68,0.07)', m: 'rgba(255,92,16,0.025)' },
+      ];
+      const sunHalos = HALO_LAYERS.map((d, i) => {
+        const sp = new THREE.Sprite(
+          new THREE.SpriteMaterial({
+            map: makeSoftSprite(d.i, d.m, 256),
+            transparent: true,
+            depthWrite: false,
+            depthTest: false,
+            blending: THREE.AdditiveBlending,
+            fog: false,
+          }),
+        );
+        sp.scale.setScalar(d.s);
+        sp.renderOrder = 3 + i;
+        sunGroup.add(sp);
+        return sp;
+      });
+
+      sunGroup.add(new THREE.PointLight(0xffd9a0, 2.2, 0, 0));
+      scene.add(new THREE.AmbientLight(0x2a3a54, 0.6));
+      scene.add(sunGroup);
+
+      /* ══════════════════════════════════════════════════════
+         7. 地球 —— NASA 实拍贴图
+
+         这里放弃程序化生成：噪声只能产出"看起来合理"的假大陆，
+         不可能长出真实的非洲大陆、阿拉伯半岛与马达加斯加。
+         真实贴图彻底解决了这个问题，代价是 3 张贴图的体积。
+
+         日面 / 夜景灯光 / 云层 分别采样后按光照方向合成，
+         于是能同时得到清晰的海陆轮廓 + 夜面城市微光 + 云层质感。
+         ══════════════════════════════════════════════════════ */
+      const EARTH_R = 132;
+      const EARTH_POS = new THREE.Vector3(-40, 1180, -1620);
+      const MOON_POS = new THREE.Vector3(200, 1470, -1380);
+
+      const earthUniforms = {
+        uTime: { value: 0 },
+        uSunDir: { value: new THREE.Vector3(1, 0, 0) },
+        uDayMap: { value: loadTex(earthDayUrl) },
+        uCloudMap: { value: loadTex(earthCloudsUrl, false) },
+        uLightsMap: { value: loadTex(earthLightsUrl) },
+      };
+
+      const earthMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(EARTH_R, 128, 88),
+        new THREE.ShaderMaterial({
+          uniforms: earthUniforms,
+          fog: false,
+          vertexShader: /* glsl */ `
+            varying vec2 vUv;
+            varying vec3 vNormalW;
+            varying vec3 vViewDirW;
+            void main() {
+              vUv = uv;
+              vec4 worldPos = modelMatrix * vec4(position, 1.0);
+              vNormalW = normalize(mat3(modelMatrix) * normal);
+              vViewDirW = normalize(cameraPosition - worldPos.xyz);
+              gl_Position = projectionMatrix * viewMatrix * worldPos;
+            }
+          `,
+          fragmentShader: /* glsl */ `
+            precision highp float;
+            varying vec2 vUv;
+            varying vec3 vNormalW;
+            varying vec3 vViewDirW;
+            uniform float uTime;
+            uniform vec3 uSunDir;
+            uniform sampler2D uDayMap;
+            uniform sampler2D uCloudMap;
+            uniform sampler2D uLightsMap;
+
+            void main() {
+              vec3 N = normalize(vNormalW);
+              vec3 L = normalize(uSunDir);
+              vec3 V = normalize(vViewDirW);
+              float ndl = dot(N, L);
+
+              /* ── 日面：真实海陆轮廓 ──
+                 three.js 那张 earth_atmos 自带一点云，这里压暗它，
+                 好让独立的云层贴图当主角（否则会叠出双层云）。 */
+              vec3 day = texture2D(uDayMap, vUv).rgb;
+              day = mix(vec3(dot(day, vec3(0.299, 0.587, 0.114))), day, 1.22);
+              day *= 0.88;
+
+              /* ── 云层：独立贴图，随时间缓慢西移 ── */
+              vec2 cuv = vec2(fract(vUv.x + uTime * 0.0016), vUv.y);
+              float clouds = texture2D(uCloudMap, cuv).r;
+              clouds = smoothstep(0.16, 0.86, clouds);
+
+              /* ── 光照：朗伯 + 柔和晨昏线 ── */
+              float lit = smoothstep(-0.20, 0.30, ndl);
+
+              /* 云在朝阳侧更亮，背光侧偏灰 */
+              vec3 cloudCol = mix(vec3(0.42, 0.46, 0.54), vec3(1.0, 0.99, 0.97), lit);
+              vec3 albedo = mix(day, cloudCol, clouds * 0.80);
+
+              vec3 col = albedo * (0.045 + 1.85 * lit);
+
+              /* ── 夜面城市灯光：直接用 NASA 夜景贴图 ── */
+              vec3 lights = texture2D(uLightsMap, vUv).rgb;
+              float night = 1.0 - lit;
+              col += lights * night * 1.55;
+
+              /* ── 海洋镜面高光（用亮度反推海陆：海面在日面图上很暗） ── */
+              float oceanMask = 1.0 - smoothstep(0.05, 0.18, dot(day, vec3(0.299, 0.587, 0.114)));
+              vec3 H = normalize(L + V);
+              float spec = pow(max(dot(N, H), 0.0), 52.0);
+              col += vec3(1.0, 0.97, 0.90) * spec * oceanMask * 0.9 * lit
+                     * (1.0 - clouds * 0.8);
+
+              /* ── 大气边缘光（菲涅尔） ── */
+              float fres = 1.0 - clamp(dot(N, V), 0.0, 1.0);
+              col += vec3(0.24, 0.52, 1.0) * pow(fres, 2.6) * (0.30 + 1.0 * max(ndl, 0.0));
+
+              gl_FragColor = vec4(col, 1.0);
+            }
+          `,
+        }),
+      );
+      earthMesh.position.copy(EARTH_POS);
+      scene.add(earthMesh);
+
+      /* 外层大气壳：背面渲染的加色菲涅尔，让轮廓发光 */
+      const earthAtmo = new THREE.Mesh(
+        new THREE.SphereGeometry(EARTH_R * 1.075, 80, 56),
+        new THREE.ShaderMaterial({
+          uniforms: { uSunDir: earthUniforms.uSunDir },
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          side: THREE.BackSide,
+          fog: false,
+          vertexShader: /* glsl */ `
+            varying vec3 vNormalW;
+            varying vec3 vViewDirW;
+            void main() {
+              vec4 worldPos = modelMatrix * vec4(position, 1.0);
+              vNormalW = normalize(mat3(modelMatrix) * normal);
+              vViewDirW = normalize(cameraPosition - worldPos.xyz);
+              gl_Position = projectionMatrix * viewMatrix * worldPos;
+            }
+          `,
+          fragmentShader: /* glsl */ `
+            varying vec3 vNormalW;
+            varying vec3 vViewDirW;
+            uniform vec3 uSunDir;
+            void main() {
+              float fres = 1.0 - clamp(dot(normalize(vNormalW), normalize(vViewDirW)), 0.0, 1.0);
+              float lit = 0.28 + 0.90 * max(dot(normalize(vNormalW), normalize(uSunDir)), 0.0);
+              gl_FragColor = vec4(vec3(0.30, 0.58, 1.0), pow(fres, 2.4) * lit * 0.62);
+            }
+          `,
+        }),
+      );
+      earthAtmo.position.copy(EARTH_POS);
+      scene.add(earthAtmo);
+
+      /* 月球：体积明显更小（0.27 倍地球）。
+         用真实月面贴图，但整体压暗 —— 它是伴随天体，不抢地球主体。 */
+      const moonMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(EARTH_R * 0.27, 48, 34),
+        new THREE.MeshStandardMaterial({
+          map: loadTex(moonMapUrl),
+          roughness: 0.98,
+          metalness: 0,
+          emissive: 0x0b0d12,
+          color: 0xb9b6ae,
+        }),
+      );
+      moonMesh.position.copy(MOON_POS);
+      scene.add(moonMesh);
+
+      /* ══════════════════════════════════════════════════════
+         8. 其余行星 + 轨道线（第三幕的太阳系结构）
+         同样放弃公转：位置固定，保证构图可控
+         ══════════════════════════════════════════════════════ */
+      type PlanetDef = {
+        orbit: number;
+        radius: number;
+        color: number;
+        emissive: number;
+        ring?: boolean;
+        phase: number;
+      };
+
+      const planetDefs: PlanetDef[] = [
+        { orbit: 900, radius: 22, color: 0x9c9186, emissive: 0x1a1712, phase: 0.9 },
+        { orbit: 1450, radius: 40, color: 0xd8b072, emissive: 0x2a2113, phase: 2.4 },
+        { orbit: 3300, radius: 58, color: 0xb4553a, emissive: 0x241009, phase: 4.1 },
+        { orbit: 4700, radius: 190, color: 0xc9a678, emissive: 0x2a2216, phase: 1.2 },
+        { orbit: 6200, radius: 162, color: 0xcbb98c, emissive: 0x2b2618, ring: true, phase: 3.3 },
+        { orbit: 7900, radius: 112, color: 0x8fcbd6, emissive: 0x17282c, phase: 5.6 },
+        { orbit: 9500, radius: 108, color: 0x4a6fbf, emissive: 0x101a30, phase: 0.4 },
+      ];
+
+      const planets: THREE.Mesh[] = [];
+
+      planetDefs.forEach((def) => {
+        const mesh = new THREE.Mesh(
+          new THREE.SphereGeometry(def.radius, 40, 28),
+          new THREE.MeshStandardMaterial({
+            color: def.color,
+            emissive: def.emissive,
+            roughness: 0.88,
+            metalness: 0.05,
+          }),
+        );
+        mesh.position.set(
+          Math.cos(def.phase) * def.orbit,
+          (Math.sin(def.phase * 2.1) * def.orbit) * 0.02,
+          Math.sin(def.phase) * def.orbit,
+        );
+
+        if (def.ring) {
+          const ring = new THREE.Mesh(
+            new THREE.RingGeometry(def.radius * 1.45, def.radius * 2.3, 96),
+            new THREE.MeshBasicMaterial({
+              color: 0xd8c79b,
+              side: THREE.DoubleSide,
+              transparent: true,
+              opacity: 0.36,
+              depthWrite: false,
+            }),
+          );
+          ring.rotation.x = Math.PI / 2 - 0.36;
+          mesh.add(ring);
+        }
+
+        scene.add(mesh);
+        planets.push(mesh);
+
+        // 轨道线：细腻低调，只给外行星画
+        const seg = 240;
+        const pts: number[] = [];
+        for (let i = 0; i <= seg; i++) {
+          const a = (i / seg) * Math.PI * 2;
+          pts.push(Math.cos(a) * def.orbit, 0, Math.sin(a) * def.orbit);
+        }
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+        const line = new THREE.Line(
+          g,
+          new THREE.LineBasicMaterial({
+            color: 0x5c86b0,
+            transparent: true,
+            opacity: 0.18,
+            depthWrite: false,
+            fog: false,
+          }),
+        );
+        scene.add(line);
+      });
+
+      /* ══════════════════════════════════════════════════════
+         9. 流星 —— 世界坐标下的严格直线（硬要求）
+         ══════════════════════════════════════════════════════ */
+      const COMET_START = new THREE.Vector3(-760, 300, 1120);
+      const COMET_END = new THREE.Vector3(900, 2100, -7800);
+      const FLIGHT_DIR = COMET_END.clone().sub(COMET_START).normalize();
+
+      const cometGroup = new THREE.Group();
+
+      const cometCore = new THREE.Mesh(
+        new THREE.SphereGeometry(7.5, 24, 18),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false }),
+      );
+      cometGroup.add(cometCore);
+
+      const cometGlow = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: makeSoftSprite('rgba(255,255,255,1)', 'rgba(150,235,255,0.55)', 128),
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          fog: false,
+        }),
+      );
+      cometGlow.scale.setScalar(118);
+      cometGroup.add(cometGlow);
+
+      const TAIL_SEG = 30;
+      const tailGeo = new THREE.BufferGeometry();
+      const tailPos = new Float32Array((TAIL_SEG + 1) * 2 * 3);
+      const tailCol = new Float32Array((TAIL_SEG + 1) * 2 * 3);
+      const tailIdx: number[] = [];
+      for (let i = 0; i < TAIL_SEG; i++) {
+        const a = i * 2;
+        tailIdx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      }
+      tailGeo.setIndex(tailIdx);
+      tailGeo.setAttribute('position', new THREE.BufferAttribute(tailPos, 3));
+      tailGeo.setAttribute('color', new THREE.BufferAttribute(tailCol, 3));
+
+      cometGroup.add(
+        new THREE.Mesh(
+          tailGeo,
+          new THREE.MeshBasicMaterial({
+            vertexColors: true,
+            transparent: true,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+            fog: false,
+          }),
+        ),
+      );
+
+      const SPARK_COUNT = LOW ? 80 : 180;
+      const sparkGeo = new THREE.BufferGeometry();
+      const sparkPos = new Float32Array(SPARK_COUNT * 3);
+      const sparkSeed = new Float32Array(SPARK_COUNT);
+      for (let i = 0; i < SPARK_COUNT; i++) sparkSeed[i] = Math.random();
+      sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
+
+      const cometSparks = new THREE.Points(
+        sparkGeo,
+        new THREE.PointsMaterial({
+          size: 6.5,
+          sizeAttenuation: true,
+          map: makeSoftSprite('rgba(215,250,255,1)', 'rgba(100,195,255,0.5)', 48),
+          color: 0xbfeaff,
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          fog: false,
+        }),
+      );
+      cometGroup.add(cometSparks);
+      scene.add(cometGroup);
+
+      /* 细碎的流星余迹：静态短划，作为远景点缀 */
+      {
+        const streakCount = LOW ? 10 : 22;
+        const g = new THREE.BufferGeometry();
+        const p = new Float32Array(streakCount * 6);
+        const c = new Float32Array(streakCount * 6);
+        const col = new THREE.Color();
+        for (let i = 0; i < streakCount; i++) {
+          const r = 6000 + Math.random() * 16000;
+          const a = Math.random() * Math.PI * 2;
+          const bx = Math.cos(a) * r;
+          const by = (Math.random() - 0.5) * 6000;
+          const bz = Math.sin(a) * r;
+          const len = 240 + Math.random() * 700;
+          p[i * 6] = bx; p[i * 6 + 1] = by; p[i * 6 + 2] = bz;
+          p[i * 6 + 3] = bx + (Math.random() - 0.5) * len;
+          p[i * 6 + 4] = by + (Math.random() - 0.5) * len * 0.35;
+          p[i * 6 + 5] = bz + (Math.random() - 0.5) * len;
+          col.setHSL(0.55 + Math.random() * 0.08, 0.5, 0.6 + Math.random() * 0.3);
+          const o = 0.16 + Math.random() * 0.3;
+          c[i * 6] = col.r * o; c[i * 6 + 1] = col.g * o; c[i * 6 + 2] = col.b * o;
+          c[i * 6 + 3] = 0; c[i * 6 + 4] = 0; c[i * 6 + 5] = 0;
+        }
+        g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+        g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+        const streaks = new THREE.LineSegments(
+          g,
+          new THREE.LineBasicMaterial({
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.5,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+            fog: false,
+          }),
+        );
+        streaks.frustumCulled = false;
+        scene.add(streaks);
+      }
+
+      /* ══════════════════════════════════════════════════════
+         10. 三幕镜头
+         关键公式（浏览器实测确认）：
+             占画面高的比例 = r / (tan(fov/2) * D)
+         fov=52 -> tan(26°) = 0.4877
+
+         太阳 r=420：
+           距 1180 -> 占画面高 0.73（第一幕：太阳占较大比例）
+           距 3500 -> 占画面高 0.25
+         地球 r=86：
+           要让地球与太阳"视觉体量接近"，距地球需 ≈ 距太阳 × 86/420
+         ══════════════════════════════════════════════════════ */
+      /* ⚠️ 相机绕太阳旋转，而不是直线后退。
+         实测教训：直线后退时太阳会从右侧"扫"过整个画面
+         （p=0.20 时太阳 x 跨度 0.19~0.60，正好压在正文上）。
+         绕行拍摄能把它稳稳固定在右侧边缘。 */
+      /* ⚠️ 相机绕太阳旋转，而不是直线后退。
+         实测教训：直线后退时太阳会从右侧"扫"过整个画面
+         （p=0.20 时太阳 x 跨度 0.19~0.60，正好压在正文上）。
+         绕行拍摄能把它稳稳固定在右侧边缘。 */
+      /* 相机：绕太阳转 + 同时后退。
+         轨道保证太阳始终停在右侧（朝向由 lookAtForP 反解），
+         后退保证它的观感体量在缩小 —— 两者解耦，互不干扰。
+
+         太阳占画面高 = 861 / 相机到太阳的距离（fov=52, r=420）：
+           距 2400 -> 0.36    距 4500 -> 0.19 */
+      /* 相机：绕太阳转 + 同时后退。
+         轨道保证太阳始终停在右侧（朝向由 lookAtForP 反解），
+         后退保证它的观感体量在缩小 —— 两者解耦，互不干扰。
+
+         太阳占画面高 = 861 / 相机到太阳的距离（fov=52, r=420）：
+           距 2400 -> 0.36    距 4500 -> 0.19 */
+      const CAM_KEYS = [
+        new THREE.Vector3(2400, 760, 2400),         // p=0    距太阳 3457，太阳占高 0.25
+        new THREE.Vector3(4500, 1250, 1150),        // p=0.45 距太阳 4794，太阳占高 0.18
+        new THREE.Vector3(-2600, 8400, -6200),      // p=1    远高俯瞰全系
+      ];
+
+      /** 视线目标：决定每幕画面中心落在哪 */
+      /* ⚠️ 视线目标不用关键帧猜，而是【按目标屏幕位置反解】。
+
+         实测教训：手填关键帧时，任一帧的微小误差都会让太阳从右侧
+         "扫"过整个画面（p=0.20 实测 x 跨度 0.19~0.60，正好压在正文上），
+         连调数轮都无法同时满足"太阳在右 + 流星在画面内"。
+
+         反解是确定性的：想让天体落在屏幕 x=wx 处，
+         就把它相对视线的夹角取 atan((wx-0.5) * 2 * tan(fov/2) * aspect)，
+         再把视线方向反向旋转这个角度即可 —— 数学上必然命中。 */
+      const _fwd = new THREE.Vector3();
+      const _rgt = new THREE.Vector3();
+      const _up = new THREE.Vector3();
+      const _aim = new THREE.Vector3();
+
+      /** 让 target 落在屏幕 (wx, wy) 的视线目标点 */
+      function aimAt(camPos: THREE.Vector3, target: THREE.Vector3, wx: number, wy: number): THREE.Vector3 {
+        _fwd.copy(target).sub(camPos).normalize();
+        _rgt.crossVectors(_fwd, new THREE.Vector3(0, 1, 0));
+        if (_rgt.lengthSq() < 1e-8) _rgt.set(1, 0, 0);
+        _rgt.normalize();
+        _up.crossVectors(_rgt, _fwd).normalize();
+
+        const tanV = Math.tan((camera.fov * Math.PI) / 360);
+        const tanH = tanV * camera.aspect;
+        const ox = (wx - 0.5) * 2 * tanH;
+        const oy = (0.5 - wy) * 2 * tanV;
+
+        // 把视线朝目标的反方向偏转，使目标落到指定屏幕位置
+        _aim.copy(_fwd).addScaledVector(_rgt, -ox).addScaledVector(_up, -oy);
+        return camPos.clone().add(_aim.normalize().multiplyScalar(1200));
+      }
+
+      /** 每帧的视线目标：按分镜需求把天体放到指定屏幕位置 */
+      function lookAtForP(p: number): THREE.Vector3 {
+        const cam = pathAt(CAM_KEYS, p);
+        // 第一幕太阳在右侧（可见）、第二幕滑到最右、第三幕远小
+        const sunX = 0.88 + p * 0.06;
+        // 地球：第二幕在右侧醒目出现
+        const earthX = 0.78;
+        const a = aimAt(cam, new THREE.Vector3(0, 0, 0), sunX, 0.3);
+        const b = aimAt(cam, EARTH_POS, earthX, 0.24);
+        // 前段以太阳为主，中段过渡到地球，尾段回到黄道中心
+        const t = Math.min(1, Math.max(0, (p - 0.2) / 0.35));
+        a.lerp(b, t);
+        if (p > 0.72) {
+          a.lerp(new THREE.Vector3(0, 0, 0), Math.min(1, (p - 0.72) / 0.28));
+        }
+        return a;
+      }
+
+      /* ── 镜头时间重映射（运镜的电影感来源）─────────────────
+         滚动进度是线性的，但镜头不该匀速走 —— 匀速会显得"机械"。
+         这里把线性进度重映射成有节奏的曲线：
+           p=0    起幅：太阳近景，走得慢（让观众看清）
+           p≈0.45 中段：加速（转场感）
+           p=1    落幅：减速停顿（俯瞰全系）
+         用「正弦缓入缓出 + 中段加速」叠加，两端导数接近 0。 */
+      function shotTiming(p: number): number {
+        const c = Math.min(1, Math.max(0, p));
+        // 基础缓动：两端慢、中间快
+        const eased = c * c * (3 - 2 * c);
+        // 再叠一层更强的中段加速，让"推进"更有力量
+        const punch = Math.sin(Math.PI * c) * 0.18;
+        return Math.min(1, Math.max(0, eased * 0.86 + c * 0.14 + punch * (c > 0 && c < 1 ? 1 : 0)));
+      }
+
+      /** 分段 smoothstep：严格经过关键帧，绝不冲过头（样条会过冲） */
+      function pathAt(keys: THREE.Vector3[], p: number): THREE.Vector3 {
+        const n = keys.length - 1;
+        const t = Math.min(1, Math.max(0, p)) * n;
+        const i = Math.min(Math.floor(t), n - 1);
+        const lt = t - i;
+        const e = lt * lt * (3 - 2 * lt);
+        return keys[i].clone().multiplyScalar(1 - e).addScaledVector(keys[i + 1], e);
+      }
+
+      /* ══════════════════════════════════════════════════════
+         11. 滚动进度 -> 动画系数
+         与旧版最大的区别：进度覆盖【整个文档】，不是 300vh
+         ══════════════════════════════════════════════════════ */
+      let rawProgress = 0;
+      let progress = 0;
+
+      function readScroll() {
+        const doc = document.documentElement;
+        const total = doc.scrollHeight - window.innerHeight;
+        rawProgress = total <= 0 ? 0 : Math.min(1, Math.max(0, window.scrollY / total));
+      }
+
+      /* ── 本地校准探针 ─────────────────────────────────────
+         只在 localhost 挂载：测量各天体在屏幕上的包围盒，
+         用来确认它们没有压到正文（正文是满宽的，所以天体必须
+         尽量待在画面边缘，不能穿过中部）。
+         生产环境不挂载，避免向全局暴露内部状态。
+
+         实现要点：不要用 camera.clone() —— 克隆体的
+         matrixWorldInverse 不会随 updateMatrixWorld 正确刷新，
+         投影结果会完全失真。这里直接挪动真实相机，算完立刻复位。 */
+      if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) {
+        (window as unknown as Record<string, unknown>).__dsProbe = (p: number) => {
+          const savedPos = camera.position.clone();
+          const savedQuat = camera.quaternion.clone();
+
+          camera.position.copy(pathAt(CAM_KEYS, shotTiming(p)));
+          camera.lookAt(lookAtForP(shotTiming(p)));
+          camera.updateMatrixWorld(true);
+          camera.updateProjectionMatrix();
+
+          const box = (pos: THREE.Vector3, radius: number) => {
+            let minX = 1, maxX = 0, minY = 1, maxY = 0, front = false;
+            for (let i = 0; i < 96; i++) {
+              const th = (i / 96) * Math.PI * 2;
+              const ph = Math.acos(1 - (2 * (i % 48)) / 48);
+              const pt = pos.clone().addScaledVector(
+                new THREE.Vector3(
+                  Math.sin(ph) * Math.cos(th),
+                  Math.cos(ph),
+                  Math.sin(ph) * Math.sin(th),
+                ),
+                radius,
+              );
+              if (pt.clone().applyMatrix4(camera.matrixWorldInverse).z > -1) continue;
+              front = true;
+              const t = pt.project(camera);
+              const x = t.x * 0.5 + 0.5;
+              const y = -t.y * 0.5 + 0.5;
+              minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+              minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+            }
+            if (!front) return null;
+            const r3 = (n: number) => +n.toFixed(3);
+            return {
+              x0: r3(minX), x1: r3(maxX), y0: r3(minY), y1: r3(maxY),
+              w: r3(maxX - minX), h: r3(maxY - minY),
+              cx: r3((minX + maxX) / 2), cy: r3((minY + maxY) / 2),
+            };
+          };
+
+          const out = {
+            p,
+            cam: camera.position.toArray().map(Math.round),
+            sun: box(new THREE.Vector3(0, 0, 0), SUN_R),
+            earth: box(EARTH_POS, EARTH_R),
+            moon: box(MOON_POS, EARTH_R * 0.27),
+            comet: box(COMET_START.clone().lerp(COMET_END, Math.pow(p, 0.85)), 10),
+          };
+
+          camera.position.copy(savedPos);
+          camera.quaternion.copy(savedQuat);
+          camera.updateMatrixWorld(true);
+          return out;
+        };
+      }
+
+      /* ══════════════════════════════════════════════════════
+         12. 每帧更新
+         ══════════════════════════════════════════════════════ */
+      const tmpV = new THREE.Vector3();
+      const lookTarget = new THREE.Vector3();
+
+      let elapsedTime = 0;
+      let lastStamp = performance.now();
+
+      function updateScene(p: number, elapsed: number) {
+        /* 流星：世界坐标严格直线。0.85 次幂让前期慢、后期快 */
+        tmpV.copy(COMET_START).lerp(COMET_END, Math.pow(p, 0.85));
+        cometGroup.position.copy(tmpV);
+        cometGroup.lookAt(tmpV.clone().add(FLIGHT_DIR));
+
+        /* ── 相机 ──────────────────────────────────────────────
+           三层叠加，做出"手持摄影"的呼吸感：
+             1) 关键帧轨迹（构图，已经被 aimAt 反解保证命中）
+             2) 镜头时间重映射（速度有节奏，不机械）
+             3) 两段不同频率的微抖（活人的手，不是轨道车）
+           微抖幅度刻意压到极小（位置 ~1.2 单位 / 角度 0.1°），
+           肉眼只感到"画面有生命"，不会察觉在抖。 */
+        const tp = shotTiming(p);
+        camera.position.copy(pathAt(CAM_KEYS, tp));
+
+        const sway = Math.sin(elapsed * 0.31) * 1.2 + Math.sin(elapsed * 0.17 + 1.3) * 0.8;
+        const bob = Math.cos(elapsed * 0.24 + 0.7) * 1.0 + Math.sin(elapsed * 0.13) * 0.6;
+        camera.position.x += sway;
+        camera.position.y += bob;
+        camera.position.z += Math.sin(elapsed * 0.19 + 2.1) * 0.9;
+
+        lookTarget.copy(lookAtForP(tp));
+        // 视线也带一点点漂移，比相机抖动更自然
+        lookTarget.x += Math.sin(elapsed * 0.21 + 0.4) * 2.4;
+        lookTarget.y += Math.cos(elapsed * 0.27 + 1.8) * 1.8;
+        camera.lookAt(lookTarget);
+
+        /* 轻微横滚（roll）：真实手持镜头几乎都会有 0.1~0.3° 的倾斜，
+           这一点点倾斜对"电影感"的贡献比想象中大。 */
+        camera.rotateZ(Math.sin(elapsed * 0.16) * 0.0018);
+
+        /* 地球的日照方向：从太阳指向地球 */
+        earthUniforms.uSunDir.value.copy(EARTH_POS).negate().normalize();
+
+        /* 自转与滚动解耦 */
+        sunCore.rotation.y = elapsed * 0.0075;
+        earthMesh.rotation.y = elapsed * 0.03;
+        earthAtmo.rotation.y = earthMesh.rotation.y;
+        planets.forEach((m, i) => {
+          m.rotation.y = elapsed * (0.05 + i * 0.012);
+        });
+        moonMesh.rotation.y = elapsed * 0.045;
+
+        /* 彗尾：长度随进度增长 */
+        const speedFactor = 0.8 + p * 1.0;
+        const tailLen = 900 * speedFactor;
+        for (let i = 0; i <= TAIL_SEG; i++) {
+          const t = i / TAIL_SEG;
+          const width = (Math.sin(t * Math.PI) * 0.6 + 0.13) * 34 * speedFactor;
+          const z = -t * tailLen;
+          const idx = i * 2;
+          tailPos[idx * 3] = -width;
+          tailPos[idx * 3 + 1] = 0;
+          tailPos[idx * 3 + 2] = z;
+          tailPos[(idx + 1) * 3] = width;
+          tailPos[(idx + 1) * 3 + 1] = 0;
+          tailPos[(idx + 1) * 3 + 2] = z;
+          const fade = Math.pow(1 - t, 2.2);
+          for (const k of [0, 1]) {
+            tailCol[(idx + k) * 3] = fade * 0.82;
+            tailCol[(idx + k) * 3 + 1] = fade * 0.95;
+            tailCol[(idx + k) * 3 + 2] = fade;
+          }
+        }
+        tailGeo.attributes.position.needsUpdate = true;
+        tailGeo.attributes.color.needsUpdate = true;
+
+        cometCore.scale.setScalar(0.9 + Math.sin(elapsed * 6) * 0.13);
+        cometGlow.scale.setScalar(118 + Math.sin(elapsed * 4.4) * 14);
+
+        for (let i = 0; i < SPARK_COUNT; i++) {
+          const seed = sparkSeed[i];
+          const t = (seed + elapsed * 0.2) % 1;
+          sparkPos[i * 3] = Math.sin(seed * 91.7) * 22 * (0.3 + t);
+          sparkPos[i * 3 + 1] = Math.cos(seed * 57.3) * 13 * (0.2 + t);
+          sparkPos[i * 3 + 2] = -t * tailLen * 0.95;
+        }
+        sparkGeo.attributes.position.needsUpdate = true;
+        (cometSparks.material as THREE.PointsMaterial).opacity = 0.7 * (0.5 + p * 0.5);
+
+        /* 外层柔光：各层以不同频率呼吸，幅度很小。
+           强度都远低于本体，所以不会暴露出分层的边界。 */
+        sunHalos.forEach((sp, i) => {
+          const k = 1 + Math.sin(elapsed * (0.42 + i * 0.15) + i * 1.3) * 0.035;
+          sp.scale.setScalar(HALO_LAYERS[i].s * k);
+        });
+
+        /* 星云与星场缓慢漂移：制造视差纵深。
+           每片星云额外做极缓慢的呼吸（不透明度 ±12%），
+           让深空"活着"，但幅度远低于察觉阈值，不会像闪烁的霓虹灯。 */
+        nebulaBases.forEach(({ sp, base, phase }) => {
+          (sp.material as THREE.SpriteMaterial).opacity =
+            base * (0.88 + 0.12 * Math.sin(elapsed * 0.11 + phase));
+        });
+        nebulaGroup.rotation.y = elapsed * 0.0035;
+        nebulaGroup.position.y = Math.sin(elapsed * 0.05) * 90;
+        starsFar.rotation.y = elapsed * 0.0018;
+        starsNear.rotation.y = elapsed * 0.0042;
+        dustField.rotation.y = elapsed * 0.0026;
+        // 微光点缀层缓慢反向自转，与星场形成微小视差
+        sparkleField.rotation.y = -elapsed * 0.0022;
+
+        /* 阅读罩强度跟随滚动减弱。
+           早先用固定强度，结果首幕合适、页脚过暗（实测页脚平均亮度仅 11）。
+           只写 CSS 变量，不触发重排，开销可忽略。 */
+        scrim.style.setProperty(
+          '--ds-scrim-opacity',
+          scrimOpacityFor(progress).toFixed(3),
+        );
+
+        /* 背景亮度随进度略降：越到后面越暗，保证正文可读 */
+        sunUniforms.uBrightness.value = 0.86 - p * 0.16;
+      }
+
+      /* ══════════════════════════════════════════════════════
+         13. 主循环
+         ══════════════════════════════════════════════════════ */
+      let running = true;
+
+      function frame() {
+        if (!running) return;
+        requestAnimationFrame(frame);
+
+        const now = performance.now();
+        // 单帧步长封顶，避免切回标签页时动画瞬跳
+        elapsedTime += Math.min(0.05, (now - lastStamp) / 1000);
+        lastStamp = now;
+
+        starUniforms.uTime.value = elapsedTime;
+        sunUniforms.uTime.value = elapsedTime;
+        earthUniforms.uTime.value = elapsedTime;
+
+        // 丝滑的来源：progress 用 lerp 逼近 rawProgress
+        progress += (rawProgress - progress) * 0.06;
+        if (Math.abs(rawProgress - progress) < 0.0002) progress = rawProgress;
+
+        updateScene(progress, elapsedTime);
+        renderer.render(scene, camera);
+      }
+
+      /* ══════════════════════════════════════════════════════
+         14. 事件
+         ══════════════════════════════════════════════════════ */
+      readScroll();
+      progress = rawProgress; // 首帧不追赶
+
+      function onResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight, false);
+        pixelRatio = Math.min(window.devicePixelRatio, window.innerWidth < 768 ? 1.5 : 2);
+        renderer.setPixelRatio(pixelRatio);
+        starUniforms.uPixelRatio.value = pixelRatio;
+        readScroll();
+      }
+
+      window.addEventListener('scroll', readScroll, { passive: true });
+      window.addEventListener('resize', onResize, { passive: true });
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          running = false;
+        } else if (!running) {
+          running = true;
+          lastStamp = performance.now();
+          frame();
+        }
+      });
+
+      /* WebGL 上下文丢失：卸掉画布与阅读罩，回到静态深空背景。
+         ⚠️ 注意【不要】移除 body 的 .ds-3d-page 类 ——
+         那正是兜底背景的来源，移掉就白屏了。
+         也不移除 body 上的 dsFallback 标记，方便排查。 */
+      renderer.domElement.addEventListener('webglcontextlost', (e: Event) => {
+        e.preventDefault();
+        running = false;
+        canvasHost.remove();
+        scrim.remove();
+        document.body.dataset.dsFallback = 'context-lost';
+        console.warn('[ds-bg] WebGL 上下文丢失，已退回静态深空背景');
+      });
+
+      frame();
+    }
+  }
+</script>

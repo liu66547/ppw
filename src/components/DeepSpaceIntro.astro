@@ -279,6 +279,21 @@ const ACTS = [
     /* ════════════════════════════════════════════════════════
        主逻辑
        ════════════════════════════════════════════════════════ */
+    /* ── 滚动进度状态 ──────────────────────────────────────
+       这两个变量与 readScroll 必须声明在 boot() 【之前】。
+       boot() 里要在挂载阅读罩之前先读一次滚动位置，
+       好让它带着正确的初始强度出现（而不是先按 CSS 兜底值
+       opacity:1 变暗、再被动画循环改回来，那是一次可见的闪烁）。
+       函数声明会提升，但 let 不会 —— 放在 boot() 之后会抛 TDZ 错误，
+       导致整个 3D 初始化中断。这个坑踩过。 */
+      let rawProgress = 0;
+      let progress = 0;
+      function readScroll() {
+        const doc = document.documentElement;
+        const total = doc.scrollHeight - window.innerHeight;
+        rawProgress = total <= 0 ? 0 : Math.min(1, Math.max(0, window.scrollY / total));
+      }
+
     function boot(THREE: typeof import('three')): void {
       const LOW = window.matchMedia('(max-width: 767px)').matches;
 
@@ -292,12 +307,53 @@ const ACTS = [
       // 但同一个强度压到页脚就太闷了（实测依据见样式里的注释）。
       const scrim = document.createElement('div');
       scrim.className = 'ds-scrim';
+
+      /* ── 阅读罩强度：滚动进度 -> opacity ──────────────────────
+       *
+       * 为什么必须分两段：
+       *   实测「刷新瞬间文字是亮的，加载完成后立刻变暗」（用户反馈）。
+       *   根因是这层罩子 —— 它在 three 加载完成后才被创建并挂到 body 上，
+       *   而挂上的一刻就带着当时的强度。所以"先亮后暗"是元素被创建的瞬间
+       *   造成的，与动画无关（已逐项排除 tilt-in / reveal / 全局动画）。
+       *
+       *   逐层剥离实测（藏掉某层后联系板块文字均值的提升）：
+       *     藏阅读罩      +33.6  <<< 就是它
+       *     藏 3D 画布    +6.5
+       *     去 tilt 旋转   +0.1
+       *     去 reveal      +0.2
+       *     停所有动画      +0.0
+       *   又做了单调性验证（固定滚动位置只改 opacity）：
+       *     op=1.0 -> 文字 88.4     op=0.554 -> 117.5
+       *     op=0.15 -> 141.8        op=0   -> 150.3
+       *   完全单调，因果确定。
+       *
+       * 分两段处理：
+       *   第一段 0~0.62：保持原有的 1.0 -> 0.55 缓降。
+       *     这一段画面上有太阳近景等巨大亮源从正文后方经过，
+       *     罩子是文字可读性的保障，不能动。
+       *   第二段 0.62~0.88：降到 0。
+       *     联系板块（页面最底部）在这个区间进入视口，
+       *     而那里已经没有任何亮源经过，罩子只剩"白白压暗文字"的副作用。
+       *     实测降到 0 后文字回到 150.3，与刷新瞬间的亮度一致。 */
+      const scrimOpacityFor = (p: number) => {
+        const t = Math.min(1, Math.max(0, p));
+        if (t <= 0.62) return 1 - (0.45 * t) / 0.62;
+        const k = Math.min(1, (t - 0.62) / 0.26);
+        const smooth = k * k * (3 - 2 * k);
+        return 0.55 * (1 - smooth);
+      };
+
+      /* ⚠️ 必须在 append 之前就把强度算好。
+         否则它挂上 DOM 的第一帧会落回 CSS 兜底值 opacity:1（最暗），
+         等动画循环跑起来才被改成正确值 —— 那又是一次可见的闪烁。
+         这正是"先亮后暗"的成因模式：元素带着错误的初始状态出现。
+         这里先读一次真实滚动位置，用最终公式算出该有的强度再挂载。 */
+      readScroll();
+      scrim.style.setProperty(
+        '--ds-scrim-opacity',
+        scrimOpacityFor(rawProgress).toFixed(3),
+      );
       document.body.appendChild(scrim);
-
-      /** 滚动进度 -> 阅读罩强度。1.0 是首幕所需强度，到结尾降到 0.55。 */
-      const scrimOpacityFor = (p: number) => 1 - 0.45 * Math.min(1, Math.max(0, p));
-
-      // 注：body 的 .ds-3d-page 类在外层已无条件加过，这里不用重复
 
       /* ── 1. 渲染器 ───────────────────────────────────────── */
       const renderer = new THREE.WebGLRenderer({
@@ -1399,14 +1455,7 @@ const ACTS = [
          11. 滚动进度 -> 动画系数
          与旧版最大的区别：进度覆盖【整个文档】，不是 300vh
          ══════════════════════════════════════════════════════ */
-      let rawProgress = 0;
-      let progress = 0;
 
-      function readScroll() {
-        const doc = document.documentElement;
-        const total = doc.scrollHeight - window.innerHeight;
-        rawProgress = total <= 0 ? 0 : Math.min(1, Math.max(0, window.scrollY / total));
-      }
 
       /* ── 本地校准探针 ─────────────────────────────────────
          只在 localhost 挂载：测量各天体在屏幕上的包围盒，
