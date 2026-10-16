@@ -4,61 +4,61 @@
       "name": "desktop-01.png",
       "y": 0,
       "pct": 0,
-      "kb": 529
+      "kb": 535
     },
     {
       "name": "desktop-02.png",
       "y": 398,
       "pct": 8,
-      "kb": 447
+      "kb": 454
     },
     {
       "name": "desktop-03.png",
       "y": 797,
       "pct": 15,
-      "kb": 392
+      "kb": 390
     },
     {
       "name": "desktop-04.png",
       "y": 1195,
       "pct": 23,
-      "kb": 716
+      "kb": 712
     },
     {
       "name": "desktop-05.png",
       "y": 1594,
       "pct": 31,
-      "kb": 746
+      "kb": 738
     },
     {
       "name": "desktop-06.png",
       "y": 1992,
       "pct": 38,
-      "kb": 711
+      "kb": 704
     },
     {
       "name": "desktop-07.png",
       "y": 2391,
       "pct": 46,
-      "kb": 705
+      "kb": 707
     },
     {
       "name": "desktop-08.png",
       "y": 2789,
       "pct": 54,
-      "kb": 552
+      "kb": 560
     },
     {
       "name": "desktop-09.png",
       "y": 3188,
       "pct": 62,
-      "kb": 386
+      "kb": 392
     },
     {
       "name": "desktop-10.png",
       "y": 3586,
       "pct": 69,
-      "kb": 369
+      "kb": 368
     },
     {
       "name": "desktop-11.png",
@@ -70,19 +70,19 @@
       "name": "desktop-12.png",
       "y": 4383,
       "pct": 85,
-      "kb": 317
+      "kb": 318
     },
     {
       "name": "desktop-13.png",
       "y": 4782,
       "pct": 92,
-      "kb": 388
+      "kb": 394
     },
     {
       "name": "desktop-14.png",
       "y": 5180,
       "pct": 100,
-      "kb": 446
+      "kb": 451
     }
   ],
   "mobile": [
@@ -90,25 +90,25 @@
       "name": "mobile-01.png",
       "y": 0,
       "pct": 0,
-      "kb": 228
+      "kb": 225
     },
     {
       "name": "mobile-02.png",
       "y": 1675,
       "pct": 20,
-      "kb": 293
+      "kb": 292
     },
     {
       "name": "mobile-03.png",
       "y": 3350,
       "pct": 40,
-      "kb": 274
+      "kb": 273
     },
     {
       "name": "mobile-04.png",
       "y": 5026,
       "pct": 60,
-      "kb": 142
+      "kb": 141
     },
     {
       "name": "mobile-05.png",
@@ -120,7 +120,7 @@
       "name": "mobile-06.png",
       "y": 8376,
       "pct": 100,
-      "kb": 165
+      "kb": 158
     }
   ],
   "url": "http://127.0.0.1:4180/"

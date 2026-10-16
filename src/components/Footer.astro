@@ -39,7 +39,7 @@ const links = [
   实测星野在这个位置的亮度不会干扰阅读，所以不需要那层遮罩。
   上边框保留，作为板块之间的分隔。
 -->
-<footer id="contact" class="relative border-t border-ink-800">
+<footer id="contact" class="ds-contact relative border-t border-ink-800">
   <!-- 底部一层微弱光晕，收尾不显得突兀 -->
   <div
     class="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-accent-500/[0.05] to-transparent"
@@ -53,13 +53,13 @@ const links = [
       <div>
         <p class="eyebrow">Contact</p>
 
-        <h2 class="mt-4 text-3xl font-bold leading-tight tracking-tight text-fog-50 md:text-4xl">
+        <h2 class="mt-4 text-3xl font-bold leading-tight tracking-tight text-white md:text-4xl">
           对我的项目有疑问，<br class="hidden sm:block" />
           或者想看看具体代码？
           <span class="mt-2 block text-accent-300">欢迎直接联系。</span>
         </h2>
 
-        <p class="mt-5 max-w-lg text-sm leading-relaxed text-fog-400">
+        <p class="mt-5 max-w-lg text-sm leading-relaxed text-fog-200">
           接口自动化的分层设计、测试数据怎么做到零残留、缺陷是怎么定位到代码行的 ——
           这些问题我都很乐意展开聊，也欢迎直接翻我的仓库。
         </p>
@@ -113,7 +113,7 @@ const links = [
 
       <!-- 右：联系方式清单，每项都标注是什么 -->
       <div class="lg:justify-self-end lg:pt-2">
-        <p class="mono text-[11px] uppercase tracking-widest text-fog-500">在哪里找到我</p>
+        <p class="mono text-[11px] uppercase tracking-widest text-fog-300">在哪里找到我</p>
 
         <ul class="mt-4 space-y-2.5">
           {
@@ -123,10 +123,10 @@ const links = [
                   href={l.href}
                   target={l.external ? '_blank' : undefined}
                   rel={l.external ? 'noopener noreferrer' : undefined}
-                  class="card group flex w-full items-center gap-3 p-3.5 lg:w-72"
+                  class="card ds-contact-card group flex w-full items-center gap-3 p-3.5 lg:w-72"
                 >
                   <span
-                    class="grid size-9 shrink-0 place-items-center rounded-lg border border-ink-600 bg-ink-850 text-fog-300 transition-colors group-hover:border-accent-500/60 group-hover:text-accent-300"
+                    class="ds-contact-icon grid size-9 shrink-0 place-items-center rounded-lg border border-ink-600 bg-ink-850 transition-colors group-hover:border-accent-500/60 group-hover:text-accent-300"
                     aria-hidden="true"
                   >
                     {l.kind === 'github' && (
@@ -143,8 +143,8 @@ const links = [
                     )}
                   </span>
                   <span class="min-w-0 flex-1">
-                    <span class="block text-[11px] text-fog-500">{l.label}</span>
-                    <span class="mono block truncate text-[13px] text-fog-100 transition-colors group-hover:text-accent-300">
+                    <span class="block text-[11px] text-fog-300">{l.label}</span>
+                    <span class="ds-contact-value mono block truncate text-[13px]">
                       {l.value}
                     </span>
                   </span>
@@ -166,3 +166,95 @@ const links = [
     </div>
   </div>
 </footer>
+
+<!--
+  ══════════════════════════════════════════════════════════════
+  联系板块的文字可读性覆盖
+
+  为什么需要这一块：
+    联系板块的背景是全站唯一"完全透明"的位置 —— 3D 星野与原初深空
+    直接透过来，而且它还落在页面最底部（画面最暗的区域）。
+    实测该板块的文字渲染亮度确实低于其他板块，观感发闷。
+
+  硬性约束（严格遵守）：
+    · 只改文字颜色 / 字重 / 文字投影 / 卡片底色透明度这四个维度
+    · 绝不动布局，绝不动其他板块，绝不提亮 3D 背景
+    · 全部选择器都以 .ds-contact 作用域或专用的 .ds-contact-* 类名开头，
+      不会影响到 Nav、Hero 等其他地方的 .btn / .card
+
+  为什么用 !important：
+    .card 与 .btn-ghost 定义在 global.css，且 .btn-primary 的背景是品牌青
+    （#14b8a6），白色文字在它上面几乎没有对比度，必须把两种按钮分开处理。
+    这里用 !important 保证覆盖顺序不受构建影响，行为可预测。
+-->
+<style>
+  /* ── 1. 主标题：纯白 + 加粗一级 + 文字投影 ──────────────────
+     原来是 font-bold(700) / color #f1f5fb。
+     字重提到 800，颜色提到纯白，并加 1px 1px 2px 的暗色投影 ——
+     投影的作用是"托住"文字，无论 3D 背景里的太阳或行星怎么移动，
+     笔画边缘都不会和背景融在一起。 */
+  .ds-contact h2 {
+    color: #ffffff !important;
+    font-weight: 800 !important;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  }
+
+  /* 标题里的强调色（欢迎直接联系。）保持品牌青，但同样加投影 */
+  .ds-contact h2 .text-accent-300 {
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  }
+
+  /* ── 2. 副标题说明文字：中亮灰 + 不透明 + 投影 ────────────────
+     原来是 text-fog-400 (#8b9ab1)，在深色星空下"若隐若现"。 */
+  .ds-contact h2 + p {
+    color: #b8c0cc !important;
+    opacity: 1 !important;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  }
+
+  /* ── 3. 右侧联系方式卡片 ────────────────────────────────────
+     卡片底色原来是 ink-900 的 80%，这里加深到 94%，
+     强化卡片与星空背景的边界感（只改不透明度，不改色相）。 */
+  .ds-contact-card {
+    background-color: color-mix(in srgb, var(--color-ink-900) 94%, transparent) !important;
+  }
+
+  /* 卡片内的文字与图标全部提到纯白 */
+  .ds-contact-card .ds-contact-value {
+    color: #ffffff !important;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  }
+  .ds-contact-icon {
+    color: #ffffff !important;
+  }
+  /* 悬停时仍然给品牌青，保留交互反馈 */
+  .ds-contact-card:hover .ds-contact-value,
+  .ds-contact-card:hover .ds-contact-icon {
+    color: var(--color-accent-300) !important;
+  }
+
+  /* ── 4. 底部按钮 ────────────────────────────────────────────
+     两种按钮分开处理，原因是对比度：
+
+     · btn-ghost：底色是深色 ink-850，白字对比度最高 → 用纯白
+     · btn-primary：底色是品牌青 accent-500 (#14b8a6)，属于中亮度背景。
+       白字在它上面的对比度只有约 2.2:1（不合格），
+       而原本的深色字是约 8:1（WCAG AAA 级）。
+       所以这个按钮【保持深色字】—— 强行改白反而更难读。
+       它本来就是所有按钮里最醒目的（实心青色），不需要再提亮。 */
+  .ds-contact .btn-ghost {
+    color: #ffffff !important;
+    border-color: var(--color-ink-600) !important;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  }
+  .ds-contact .btn-ghost:hover {
+    color: var(--color-accent-300) !important;
+  }
+
+  /* 主按钮：只加投影提升边缘清晰度，字色保持高对比的深色 */
+  .ds-contact .btn-primary {
+    color: var(--color-ink-950) !important;
+    font-weight: 700 !important;
+    text-shadow: none;
+  }
+</style>
