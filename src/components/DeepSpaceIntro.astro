@@ -708,6 +708,9 @@
       const sunUniforms = {
         uTime: { value: 0 },
         uIntensity: { value: 1 },
+        /* 0 = 远景，1 = 贴到脸上。
+           近距离时必须补高频细节，否则 40° 的日面就是一片平滑色块。 */
+        uDetail: { value: 0 },
       };
 
       const sunCore = new THREE.Mesh(
@@ -734,6 +737,7 @@
             varying vec3 vViewDirW;
             uniform float uTime;
             uniform float uIntensity;
+            uniform float uDetail;
 
             ${NOISE_GLSL}
 
@@ -753,14 +757,37 @@
               float flow = dsFbm(n * 2.3 + vec3(uTime * 0.048, uTime * 0.030, 0.0), 3);
               float heat = clamp(granule * 0.72 + flow * 0.48, 0.0, 1.0);
 
+              /* ── 近视细节 ──────────────────────────────────────
+                 远景时上面那几层就够了；但相机贴到太阳旁边时，
+                 日面会铺满 40° 的视场，n*6 这种低频噪声就退化成
+                 一片平滑的黄色。这里补两层高频米粒：
+                   中层 n*58   负责"颗粒"的整体密度
+                   高层 n*130  负责颗粒内部的细碎结构
+                 胞界（dsRidge 的反相）压暗，才有真实太阳表面那种
+                 "元胞之间是暗缝"的质感。
+                 与地球的做法一致：只在近景开启，远景自动归零。 */
+              if (uDetail > 0.01) {
+                float midGrain = dsFbm(n * 58.0 + vec3(0.0, uTime * 0.06, uTime * 0.04), 3);
+                float fineGrain = dsFbm(n * 130.0 - vec3(uTime * 0.09, 0.0, 0.0), 2);
+                float cellWall = dsRidge(n * 96.0 + vec3(uTime * 0.03, 0.0, 0.0), 2);
+
+                // 颗粒亮度：两层叠加后归一化
+                float grain = midGrain * 0.62 + fineGrain * 0.38;
+                // 胞界压暗：元胞边缘比胞心暗，这是太阳表面最标志性的特征
+                grain *= 1.0 - cellWall * 0.42;
+
+                // 用近景细节替换一部分原 heat，保留大尺度明暗分布
+                heat = mix(heat, heat * 0.32 + grain * 1.06, uDetail * 0.92);
+              }
+
               /* 色温分层：核心白热 -> 亮黄 -> 金橙 -> 边缘深橙红 */
               vec3 deep   = vec3(0.86, 0.19, 0.014);
               vec3 mid    = vec3(1.00, 0.55, 0.085);
               vec3 bright = vec3(1.00, 0.87, 0.54);
               vec3 hot    = vec3(1.00, 0.99, 0.96);
               vec3 col = mix(deep, mid, smoothstep(0.06, 0.48, heat));
-              col = mix(col, bright, smoothstep(0.44, 0.78, heat));
-              col = mix(col, hot, smoothstep(0.76, 1.0, heat));
+              col = mix(col, bright, smoothstep(0.38, 0.72, heat));
+              col = mix(col, hot, smoothstep(0.70, 0.97, heat));
 
               /* 黑子 + 半影 */
               float spotF = dsFbm(n * 3.4 + vec3(uTime * 0.006, 41.0, 0.0), 3);
@@ -777,8 +804,11 @@
               col *= mix(1.0, 0.62, pow(fres, 1.22));
 
               /* 边缘白炽环：这颗恒星最容易被认出来的特征 */
-              col += vec3(1.0, 0.98, 0.93) * pow(fres, 3.1) * 1.25;
-              col += vec3(1.0, 0.60, 0.19) * pow(fres, 1.6) * 0.42;
+              /* 近景时这圈环会覆盖很大一片面积、把细节冲掉，
+                 所以按 uDetail 衰减。 */
+              float rimFade = 1.0 - uDetail * 0.55;
+              col += vec3(1.0, 0.98, 0.93) * pow(fres, 3.1) * 1.25 * rimFade;
+              col += vec3(1.0, 0.60, 0.19) * pow(fres, 1.6) * 0.42 * rimFade;
 
               // 热辐射：暗部也带一点自发光，避免死黑
               col += vec3(0.16, 0.09, 0.03) * pow(heat, 3.0);
@@ -1682,8 +1712,19 @@
 
         moonMesh.rotation.y = elapsed * 0.06;
 
-        // 太阳亮度：Act 1 不可见也没关系，后面按幕次微调
-        sunUniforms.uIntensity.value = 0.94 - p * 0.08;
+        /* 太阳：亮度与细节都随"贴近程度"调整。
+         *
+         * closeness 用角径衡量：角径 > 0.55 rad（约 31°）时算贴脸。
+         * 近距离必须把亮度压下来 —— 整颗日面的亮度都高于泛光阈值时，
+         * 泛光会把细节全部抹平，看起来就是"模糊的一坨黄色"。
+         * 压到阈值附近之后，米粒组织才留得住。 */
+        {
+          const sunDist = Math.max(camPos.length(), SUN_R * 1.2);
+          const sunAngRad = 2 * Math.atan(SUN_R / sunDist);
+          const closeness = smooth(0.10, 0.55, sunAngRad);
+          sunUniforms.uDetail.value = closeness;
+          sunUniforms.uIntensity.value = (0.94 - p * 0.08) * (1 - closeness * 0.20);
+        }
         sunHalos.forEach((sp, i) => {
           const k = 1 + Math.sin(elapsed * (0.42 + i * 0.15) + i * 1.3) * 0.035;
           sp.scale.setScalar(HALO_LAYERS[i].s * k);
