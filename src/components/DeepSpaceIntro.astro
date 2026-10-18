@@ -620,9 +620,14 @@
         return pts;
       }
 
-      const starsFar = buildStars(LOW ? 2600 : 5200, 40000, 260000, 60, 190);
-      const starsNear = buildStars(LOW ? 700 : 1500, 6000, 70000, 120, 380);
-      scene.add(starsFar, starsNear);
+      /* 三层星空：远/中/近，密度递增、亮度递减。
+         用户要求"更多星点，但不要盖过太阳系" ——
+         所以加密的方式是【加数量 + 压亮度】，
+         单颗星点的大小和上限亮度都保持很低。 */
+      const starsFar = buildStars(LOW ? 4200 : 9000, 60000, 300000, 55, 150);
+      const starsMid = buildStars(LOW ? 2600 : 5600, 24000, 110000, 70, 210);
+      const starsNear = buildStars(LOW ? 1100 : 2400, 5000, 60000, 100, 320);
+      scene.add(starsFar, starsMid, starsNear);
 
       /** 星芒亮星：数量刻意很少 —— 星芒是点缀，多了会花 */
       {
@@ -735,6 +740,73 @@
           bases.push({ sp, base: d.o, phase: i * 1.31 });
         });
         var nebulaBases = bases;
+      }
+
+      /* ── 创生之柱（Pillars of Creation）──────────────────────
+         放在首幕视野正前方的极远处，作为深空背景结构。
+         做法：每根柱子由若干层递减宽度的星云 Sprite 叠成，
+         底部暗、顶部逐渐被照亮 —— 这是创生之柱最标志性的形态。
+
+         刻意压得很暗（透明度 0.16~0.28），
+         它只是"远处有什么东西"的暗示，不能和太阳系抢注意力。 */
+      const pillars = new THREE.Group();
+      {
+        const pTexA = makeNebulaTexture(256, 77.3);
+        const pTexB = makeNebulaTexture(256, 131.9);
+
+        // 三根，高低错落（原图就是这种参差感）
+        const cols = [
+          { x: -4200, h: 21000, w: 8200, o: 0.62 },
+          { x: 1400, h: 30000, w: 11000, o: 0.72 },
+          { x: 6400, h: 17500, w: 6600, o: 0.54 },
+        ];
+
+        cols.forEach((c) => {
+          const SEG = 8;
+          for (let i = 0; i < SEG; i++) {
+            const f = i / (SEG - 1);           // 0 = 底，1 = 顶
+            const sp = new THREE.Sprite(
+              new THREE.SpriteMaterial({
+                map: i % 2 ? pTexB : pTexA,
+                // 底部的尘埃偏暖褐，顶部被星光照亮偏冷蓝
+                color: f < 0.28 ? 0xc4905a : f < 0.62 ? 0x9fb4cf : 0xbcd6ea,
+                transparent: true,
+                depthWrite: false,
+                depthTest: false,
+                blending: THREE.AdditiveBlending,
+                fog: false,
+                opacity: c.o * (0.45 + 0.55 * f),
+              }),
+            );
+            // 略微向上、向一侧偏移，避免排成一根笔直的柱子
+            sp.position.set(c.x * (1 + f * 0.1), c.h * f - c.h * 0.35, f * 900);
+            sp.scale.setScalar(c.w * (1 - f * 0.5));
+            sp.renderOrder = -9;
+            pillars.add(sp);
+          }
+        });
+
+        // 底部的尘埃带：把三根柱子锚在同一团气体里
+        const haze = new THREE.Sprite(
+          new THREE.SpriteMaterial({
+            map: pTexA,
+            color: 0x8a6a4e,
+            transparent: true,
+            depthWrite: false,
+            depthTest: false,
+            blending: THREE.AdditiveBlending,
+            fog: false,
+            opacity: 0.34,
+          }),
+        );
+        haze.scale.setScalar(38000);
+        haze.position.y = -11000;
+        haze.renderOrder = -9;
+        pillars.add(haze);
+
+        pillars.position.set(5000, -9000, 72000);
+        pillars.rotation.z = 0.06;   // 轻微倾斜，避免过于规整
+        scene.add(pillars);
       }
 
       /* ══════════════════════════════════════════════════════
@@ -1173,6 +1245,10 @@
          ══════════════════════════════════════════════════════ */
       const cometGroup = new THREE.Group();
       scene.add(cometGroup);
+      /* 用户决定删掉彗星 —— 整组隐藏。
+         内部对象与更新逻辑保留（改动最小、风险最低），
+         但不再参与绘制，画面里不会出现。 */
+      cometGroup.visible = false;
 
       const cometCore = new THREE.Mesh(
         new THREE.SphereGeometry(26, 28, 20),
@@ -1275,6 +1351,7 @@
       );
       cometWake.renderOrder = 6;
       scene.add(cometWake);
+      cometWake.visible = false;
 
       /* 运动轨迹：一条从彗核向后延伸的长线，沿【速度反向】。
          它是"疾驰感"的关键 —— 光有尾巴不够，
@@ -1874,7 +1951,8 @@
         sunCore.rotation.y = elapsed * 0.007;
 
         /* ── 背景缓慢自转，制造视差 ── */
-        starsFar.rotation.y = elapsed * 0.0016;
+        starsFar.rotation.y = elapsed * 0.0014;
+        starsMid.rotation.y = elapsed * 0.0026;
         starsNear.rotation.y = elapsed * 0.0038;
         dustField.rotation.y = elapsed * 0.0022;
         sparkleField.rotation.y = -elapsed * 0.0018;
