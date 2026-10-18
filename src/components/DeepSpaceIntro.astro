@@ -754,22 +754,23 @@
            Credit: NASA, ESA/Hubble and the Hubble Heritage Team
          放在首幕视野右前方的极远处，加色混合（黑底不留方块边），
          opacity 0.55，是"远处有什么东西"的暗示，不抢太阳系。 */
+      const pillars = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          transparent: true,
+          depthWrite: false,
+          depthTest: false,
+          blending: THREE.AdditiveBlending,
+          opacity: 0.46,
+          fog: false,
+        }),
+      );
+      // 照片比例 1280:1335 ≈ 0.96，缩放保持这个比例
+      pillars.scale.set(46000, 48000, 1);
+      /* 位置留空 —— 首帧里按【目标屏幕位置】反解世界坐标（见 updateScene）。
+         手填世界坐标试过两次，投影后都压在标题与正文上。 */
+      pillars.renderOrder = -11;
+      scene.add(pillars);
       {
-        const pillars = new THREE.Sprite(
-          new THREE.SpriteMaterial({
-            transparent: true,
-            depthWrite: false,
-            depthTest: false,
-            blending: THREE.AdditiveBlending,
-            opacity: 0.46,
-            fog: false,
-          }),
-        );
-        // 照片比例 1280:1335 ≈ 0.96，缩放保持这个比例
-        pillars.scale.set(66000, 69000, 1);
-        pillars.position.set(30000, 15000, 130000);
-        pillars.renderOrder = -11;
-        scene.add(pillars);
 
         /* 照片加载后先抹掉四周的 alpha 再贴上去。
            JPEG 没有透明通道，黑底在加色混合下仍会叠一点亮度，
@@ -1613,6 +1614,7 @@
       /* ══════════════════════════════════════════════════════
          10. 每帧更新
          ══════════════════════════════════════════════════════ */
+      let pillarsAnchored = false;
       const _cometWorld = new THREE.Vector3();
       const _cometPrev = new THREE.Vector3();
       const _velWorld = new THREE.Vector3();
@@ -1624,6 +1626,18 @@
       let tailInited = false;
 
       function updateScene(p: number, elapsed: number): void {
+        /* 创生之柱：首帧按【目标屏幕位置】反解世界坐标。
+           放在这里而不是创建 Sprite 的地方，是因为反解要用到
+           CAM_KEYS / lookAtForP / screenRayPoint —— 那几样在下面才定义，
+           提前调用会踩 TDZ（暂时性死区）。
+           0.86 / 0.20 是首幕右侧的空白星区，避开标题与正文。 */
+        if (!pillarsAnchored) {
+          pillarsAnchored = true;
+          const cam0 = pathAt(CAM_KEYS, 0);
+          const look0 = lookAtForP(0, cam0);
+          pillars.position.copy(screenRayPoint(cam0, look0, 0.86, 0.20, 130000));
+        }
+
         const tp = shotTiming(p);
 
         /* ── 相机 ── */
