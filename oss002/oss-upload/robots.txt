@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://len666.top/sitemap.xml
