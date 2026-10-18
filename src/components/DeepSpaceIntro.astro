@@ -1193,6 +1193,23 @@
       cometGlow.scale.setScalar(420);
       cometGroup.add(cometGlow);
 
+      /* 十字星芒：亮点的经典视觉语言。
+         加这一层之后，即使彗星在屏幕上移动很慢，
+         也一眼能认出"这是一个发光的飞行物"，而不是一个白点。 */
+      const cometFlare = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: makeSparkleTexture(128),
+          color: 0xd8ecff,
+          transparent: true,
+          depthWrite: false,
+          depthTest: false,
+          blending: THREE.AdditiveBlending,
+          opacity: 0.85,
+          fog: false,
+        }),
+      );
+      cometGroup.add(cometFlare);
+
       /* 彗尾：两条 —— 离子尾（偏蓝、细长笔直）+ 尘埃尾（偏黄、宽而弯） */
       const TAIL_SEG = 34;
       type Tail = {
@@ -1550,9 +1567,29 @@
         camera.lookAt(look);
         camera.rotateZ(Math.sin(elapsed * 0.16) * 0.0022);
 
-        /* ── 彗星：屏幕定位 ── */
+        /* ── 彗星：屏幕定位 + 摆动 ────────────────────────────
+         *
+         * 镜头相对定位保证它始终在画面里，但副作用是"屏幕上纹丝不动"，
+         * 静止看几秒会以为那是个白点，认不出是流星。
+         *
+         * 这里叠三组慢速摆动：
+         *   · 两组不同频率的水平/垂直正弦（幅度约屏宽 3%）
+         *     单一频率会像机械振动，两组不同频率才像悬浮游动
+         *   · 距离脉动 ±9%，彗星尺寸与拖尾长度随之呼吸
+         * 幅度刻意控制在不跑出空白区的范围，不会压到正文。
+         */
         const cs = cometScreen(p);
-        _cometWorld.copy(screenRayPoint(camPos, look, cs.x, cs.y, cs.d));
+        const swayX =
+          Math.sin(elapsed * 0.62) * 0.030 + Math.sin(elapsed * 1.07 + 1.7) * 0.012;
+        const swayY =
+          Math.cos(elapsed * 0.48 + 0.6) * 0.028 + Math.sin(elapsed * 0.93 + 2.3) * 0.011;
+        const swayD = 1 + Math.sin(elapsed * 0.37) * 0.09;
+
+        const csx = cs.x + swayX;
+        const csy = cs.y + swayY;
+        const csd = cs.d * swayD;
+
+        _cometWorld.copy(screenRayPoint(camPos, look, csx, csy, csd));
         cometGroup.position.copy(_cometWorld);
 
         /* ── 尾流方向 = 世界速度的反向 ──────────────────────────
@@ -1617,7 +1654,7 @@
         // 尾巴长度与宽度都以"到镜头的距离"为基准 ——
         // 早期版本用了固定常数，结果尾巴展开到 1700+ 单位，
         // 在画面上就是一大块灰色楔形，直接盖住正文。
-        const tailLen = cs.d * 0.95;
+        const tailLen = csd * 0.95;
 
         if (!tailInited) {
           for (let i = 0; i <= TAIL_SEG; i++) tailPath.push(_cometWorld.clone());
@@ -1655,8 +1692,9 @@
          * 旋转角用 tailAxis 在屏幕平面的分量算出来 ——
          * 注意 viewUp 实际指向屏幕下方（叉积手性），所以 Y 取反。 */
         {
-          const len = cs.d * 0.55;
-          const wid = cs.d * 0.035;
+          // 长度带一点呼吸，和距离脉动呼应
+          const len = csd * 0.55 * (1 + Math.sin(elapsed * 1.35) * 0.07);
+          const wid = csd * 0.038;
           const dx = tailAxis.dot(viewRgt);
           const dyUp = -tailAxis.dot(viewUp);
           /* 用 center 把锚点钉在贴图的【左端】，
@@ -1666,7 +1704,10 @@
           cometWake.center.set(0, 0.5);
           cometWake.position.copy(_cometWorld);
           cometWake.scale.set(len, wid, 1);
-          cometWake.material.rotation = Math.atan2(dyUp, dx);
+          /* 尾迹方向再叠一个小角度摆动 —— 它甩起来，
+             整个画面就有"物体在动"的感觉了。 */
+          cometWake.material.rotation =
+            Math.atan2(dyUp, dx) + Math.sin(elapsed * 0.83) * 0.11;
           // 贴图从彗核端开始，所以要把中心挪到一半处（上面已做）
         }
 
@@ -1678,7 +1719,7 @@
           for (let i = 0; i <= TAIL_SEG; i++) {
             const f = i / TAIL_SEG;             // 0 = 彗核, 1 = 尾梢
             // 尾流呈锥形张开：越远越宽，这是高速物体尾迹的形态
-            const spread = (0.0012 + f * 0.010) * t.width * cs.d;
+            const spread = (0.0012 + f * 0.010) * t.width * csd;
             const base = _cometWorld
               .clone()
               .addScaledVector(tailAxis, f * tailLen * lenScale)
@@ -1713,10 +1754,10 @@
         for (let i = 0; i < STREAK_COUNT; i++) {
           const ang = (i / STREAK_COUNT) * Math.PI * 2 + elapsed * 0.3;
           // 挪到离彗核更远的地方：贴近彗核会糊成一团划痕
-          const rad = cs.d * (0.10 + ((i * 37) % 100) / 100 * 0.16);
+          const rad = csd * (0.10 + ((i * 37) % 100) / 100 * 0.16);
           const lateral = side.clone().multiplyScalar(Math.cos(ang) * rad)
             .addScaledVector(up2, Math.sin(ang) * rad);
-          const len = cs.d * (0.04 + ((i * 53) % 100) / 100 * 0.09);
+          const len = csd * (0.04 + ((i * 53) % 100) / 100 * 0.09);
           const head = _cometWorld.clone().add(lateral);
           const tailPt = head.clone().addScaledVector(tailAxis, len);
           streakPos[i * 6] = head.x;
@@ -1741,7 +1782,7 @@
           for (let i = 0; i < SPARK_COUNT; i++) {
             const f = Math.pow(Math.random(), 1.4);
             const d2 = f * tailLen * 1.5;
-            const rad = f * cs.d * 0.06;
+            const rad = f * csd * 0.06;
             const ang = Math.random() * Math.PI * 2;
             const px = _cometWorld.x + tailAxis.x * d2 + side.x * Math.cos(ang) * rad + up2.x * Math.sin(ang) * rad;
             const py = _cometWorld.y + tailAxis.y * d2 + side.y * Math.cos(ang) * rad + up2.y * Math.sin(ang) * rad;
@@ -1755,8 +1796,11 @@
 
         // 彗核脉冲 + 朝向镜头（尺寸按距离缩放，保证"近大远小"）
         const pulse = 1 + Math.sin(elapsed * 4.2) * 0.1;
-        cometCore.scale.setScalar(cs.d * 0.00045 * pulse);
-        cometGlow.scale.setScalar(cs.d * 0.032 * (1 + Math.sin(elapsed * 2.1) * 0.06));
+        cometCore.scale.setScalar(csd * 0.00045 * pulse);
+        cometGlow.scale.setScalar(csd * 0.032 * (1 + Math.sin(elapsed * 2.1) * 0.06));
+        cometFlare.scale.setScalar(csd * 0.16 * (1 + Math.sin(elapsed * 1.6 + 0.9) * 0.08));
+        // 星芒缓慢自转，读起来是"有能量在流动"
+        cometFlare.material.rotation = elapsed * 0.12;
 
         /* ── 地球 / 月球 / 太阳的朝向与亮度 ──
          *
