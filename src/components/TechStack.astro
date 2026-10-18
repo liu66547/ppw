@@ -30,7 +30,7 @@ const alsoCount = techStack.also.length;
       <div class="reveal">
         <p class="eyebrow">Tech Stack</p>
         <h2 class="mt-3 text-2xl font-bold tracking-tight text-fog-50 md:text-3xl">
-          每天在用的技术栈
+          技术栈
         </h2>
       </div>
       <p class="reveal mono flex items-baseline gap-3 text-xs text-fog-400">
@@ -48,6 +48,11 @@ const alsoCount = techStack.also.length;
       </p>
     </div>
 
+    <!-- 交互提示：点击可以跳到下方「专业技能」并高亮 -->
+    <p class="reveal mono mt-4 text-[11px] tracking-wide text-fog-500">
+      点击任意技术 → 跳到下方「专业技能」并高亮对应条目
+    </p>
+
     <!-- 主体：分层 lane -->
     <dl class="tech-lanes reveal mt-9">
       {
@@ -59,7 +64,9 @@ const alsoCount = techStack.also.length;
             <dt class="tech-label">{g.label}</dt>
             <dd class="tech-chips">
               {g.items.map((item) => (
-                <span class="tech-chip">{item}</span>
+                <button type="button" class="tech-chip" data-tech={item}>
+                  {item}
+                </button>
               ))}
             </dd>
           </div>
@@ -67,10 +74,16 @@ const alsoCount = techStack.also.length;
       }
     </dl>
 
-    <!-- 另了解：刻意弱化，但不再"看不见" -->
+    <!-- 另了解：也可以点，行为同上 -->
     <p class="reveal mt-9 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-ink-800/80 pt-6">
       <span class="mono text-[11px] uppercase tracking-widest text-fog-400">另有了解</span>
-      {techStack.also.map((item) => <span class="tech-also">{item}</span>)}
+      {
+        techStack.also.map((item) => (
+          <button type="button" class="tech-also" data-tech={item}>
+            {item}
+          </button>
+        ))
+      }
     </p>
   </div>
 </section>
@@ -148,6 +161,9 @@ const alsoCount = techStack.also.length;
   .tech-chip {
     display: inline-flex;
     align-items: center;
+    font: inherit;
+    cursor: pointer;
+    text-align: left;
     border-radius: 9999px;
     padding: 0.28rem 0.7rem;
     font-size: 0.8125rem;
@@ -179,6 +195,9 @@ const alsoCount = techStack.also.length;
 
   /* 另了解：比主标签暗一档，但仍清楚可读 */
   .tech-also {
+    font: inherit;
+    cursor: pointer;
+    background: transparent;
     border-radius: 9999px;
     padding: 0.2rem 0.6rem;
     font-size: 0.8125rem;
@@ -216,3 +235,77 @@ const alsoCount = techStack.also.length;
     }
   }
 </style>
+
+<script>
+  /**
+   * 交互：点击技术栈标签 -> 跳到下方「专业技能」并高亮对应条目。
+   *
+   * 两个细节：
+   *   · 匹配用"文本相等 -> 首词相等 -> 前缀相等"三级回退，
+   *     因为两处措辞并不完全一致（比如这里写 Selenium WebDriver，
+   *     技能板块里是 Selenium）。
+   *   · 平滑滚动本身会触发 scroll 事件，如果不加锁，
+   *     "滚动即取消高亮"的逻辑会立刻把刚加的高亮清掉。
+   *     所以点击后锁 900ms，之后用户自己滚动才清除。
+   */
+  {
+    const stack = document.getElementById('stack');
+    const skills = document.getElementById('skills');
+
+    if (stack && skills) {
+      let locked = false;
+
+      const clearAll = () => {
+        document.querySelectorAll('[data-tech-hl]').forEach((el) => {
+          el.removeAttribute('data-tech-hl');
+        });
+      };
+
+      const findTarget = (want: string): HTMLElement | null => {
+        const key = want.split(/[\s/]+/)[0];
+        const leaves = Array.from(skills.querySelectorAll<HTMLElement>('*')).filter(
+          (el) => el.children.length === 0 && (el.textContent || '').trim().length > 0,
+        );
+        const norm = (v: string) => v.trim().toLowerCase();
+        return (
+          leaves.find((el) => norm(el.textContent || '') === norm(want)) ||
+          leaves.find((el) => norm(el.textContent || '') === norm(key)) ||
+          leaves.find((el) => {
+            const t = norm(el.textContent || '');
+            return key.length > 2 && t.startsWith(norm(key));
+          }) ||
+          null
+        );
+      };
+
+      stack.addEventListener('click', (e) => {
+        const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-tech]');
+        if (!btn) return;
+        const want = btn.dataset.tech || '';
+
+        clearAll();
+        const hit = findTarget(want);
+
+        if (hit) {
+          hit.setAttribute('data-tech-hl', '');
+          locked = true;
+          hit.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          window.setTimeout(() => {
+            locked = false;
+          }, 900);
+        } else {
+          skills.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+
+      window.addEventListener(
+        'scroll',
+        () => {
+          if (locked) return;
+          clearAll();
+        },
+        { passive: true },
+      );
+    }
+  }
+</script>

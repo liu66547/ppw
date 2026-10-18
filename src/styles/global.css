@@ -958,3 +958,20 @@ h1 .text-gradient {
   outline-offset: 2px;
   border-radius: 0.25rem;
 }
+
+/* ── 技术栈 -> 专业技能的高亮标记 ────────────────────────────────
+   由 TechStack 的点击脚本打在技能板块的匹配元素上。
+   用属性选择器而不是类名，方便脚本一次性 setAttribute/removeAttribute。 */
+[data-tech-hl] {
+  color: #04121a !important;
+  background-color: var(--color-accent-300) !important;
+  border-color: var(--color-accent-300) !important;
+  border-radius: 9999px !important;
+  box-shadow:
+    0 0 0 3px rgba(94, 234, 212, 0.22),
+    0 0 26px rgba(94, 234, 212, 0.5) !important;
+  transition:
+    color 0.18s ease,
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+}

@@ -426,6 +426,41 @@
       }
 
       /**
+       * 拖尾贴图：横向（沿长度）渐隐、纵向（宽度）柔边。
+       * 用于彗星的屏幕空间拖尾 —— 左端是彗核（最亮），右端完全透明。
+       */
+      function makeStreakTexture(w = 256, h = 64): THREE.Texture {
+        const cv = document.createElement('canvas');
+        cv.width = w;
+        cv.height = h;
+        const ctx = cv.getContext('2d')!;
+        const img = ctx.createImageData(w, h);
+        const d = img.data;
+        for (let y = 0; y < h; y++) {
+          // 纵向：中心亮、两边柔
+          const v = (y / (h - 1)) * 2 - 1;
+          const vert = Math.pow(Math.max(0, 1 - v * v), 1.6);
+          for (let x = 0; x < w; x++) {
+            // 横向：从彗核（x=0）向尾梢快速衰减
+            const t = x / (w - 1);
+            const along = Math.pow(1 - t, 1.9);
+            // 尾梢加一点细碎抖动，避免像一根棍子
+            const grain = 0.86 + 0.14 * Math.sin(t * 42.0) * Math.sin(t * 11.0);
+            const a = Math.pow(along * vert * grain, 0.9);
+            const i = (y * w + x) * 4;
+            d[i] = 255;
+            d[i + 1] = 252;
+            d[i + 2] = 245;
+            d[i + 3] = Math.round(Math.min(1, a) * 255);
+          }
+        }
+        ctx.putImageData(img, 0, 0);
+        const tex = new THREE.CanvasTexture(cv);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        return tex;
+      }
+
+      /**
        * 星云贴图：径向衰减 × 脊状噪声阈值。
        * 用脊状而不是普通 fbm，是为了得到"丝絮/筋络"的质感，
        * 普通 fbm 阈值切出来是棉花团，没有星云的通透感。
@@ -1195,7 +1230,34 @@
         return { mesh, pos, col, width, rgb: geoColor };
       }
       const tailIon = makeTail([0.62, 0.86, 1.0], 1.0);
+      /* 尘埃尾已停用 —— 它渲染出来是一大片灰褐色楔形，
+         用户明确要求删掉（截图里"球左边那个东西"就是它）。
+         对象仍创建（type 需要），但不加入场景。 */
       const tailDust = makeTail([1.0, 0.86, 0.62], 2.1);
+      tailDust.mesh.visible = false;
+
+      /* 离子尾也停用：ribbon 在世界空间里展开，
+         相机一转就会和彗核在屏幕上脱开，变成"旁边飘着一条线"。
+         改用下面的 Sprite 拖尾。 */
+      tailIon.mesh.visible = false;
+
+      /* ── 彗星拖尾：屏幕空间 Sprite ────────────────────────────
+         永远正对镜头，可非等比缩放 + 绕视线旋转，
+         所以不管机位怎么变，它都稳稳连在彗核后面。 */
+      const cometWake = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: makeStreakTexture(256, 64),
+          color: 0xbfe0ff,
+          transparent: true,
+          depthWrite: false,
+          depthTest: false,
+          blending: THREE.AdditiveBlending,
+          opacity: 0.9,
+          fog: false,
+        }),
+      );
+      cometWake.renderOrder = 6;
+      scene.add(cometWake);
 
       /* 运动轨迹：一条从彗核向后延伸的长线，沿【速度反向】。
          它是"疾驰感"的关键 —— 光有尾巴不够，
@@ -1221,7 +1283,9 @@
 
       /* 速度线：若干沿运动方向的短线段，散布在彗核周围。
          这是最直接的"在飞"的视觉语言（类似动画里的集中线）。 */
-      const STREAK_COUNT = LOW ? 6 : 12;
+      /* 速度线也停用：它在彗核旁边形成一圈细碎划痕，
+         和"删掉左侧那个东西"是同一处问题。 */
+      const STREAK_COUNT = 0;
       const streakGeo = new THREE.BufferGeometry();
       const streakPos = new Float32Array(STREAK_COUNT * 2 * 3);
       const streakCol = new Float32Array(STREAK_COUNT * 2 * 3);
@@ -1259,6 +1323,7 @@
         }),
       );
       cometSparks.frustumCulled = false;
+      cometSparks.visible = false;
       cometGroup.add(cometSparks);
 
       /* ══════════════════════════════════════════════════════
@@ -1358,13 +1423,17 @@
        * Act 1 正中；Act 2 飘到左侧；Act 4 移到右侧（让地球占左侧）。
        */
       function cometScreen(p: number): { x: number; y: number; d: number } {
+        /* 首屏（p=0）落在右侧空白区 0.80/0.26 —— 那里没有正文，
+           不会挡住标题和段落。之后向左划过再回到右侧，
+           运动幅度更大，速度感也更强（用户："动起来就无所谓了"）。 */
         const x = lerp(
-          lerp(0.5, 0.24, smooth(0.05, 0.30, p)),
+          lerp(0.80, 0.24, smooth(0.04, 0.30, p)),
           lerp(0.24, 0.84, smooth(0.40, 0.68, p)),
           smooth(0.34, 0.46, p),
         );
-        // 后段压到 0.30，给右侧的太阳（约 0.63~0.72）让出位置
-        const y = lerp(0.46, 0.30, smooth(0.1, 0.6, p));
+        // 起始 0.26 是高处的空白带；后段压到 0.30，给右侧的太阳让位
+        const y = lerp(0.26, 0.34, smooth(0.06, 0.30, p)) * (1 - smooth(0.3, 0.6, p))
+          + 0.30 * smooth(0.3, 0.6, p);
         /* 到镜头的距离：全程缓慢逼近，读起来就是"它在朝你飞" */
         // 结尾（俯瞰）时让它退远，成为画面里的一个远点
         const d = lerp(
@@ -1548,7 +1617,7 @@
         // 尾巴长度与宽度都以"到镜头的距离"为基准 ——
         // 早期版本用了固定常数，结果尾巴展开到 1700+ 单位，
         // 在画面上就是一大块灰色楔形，直接盖住正文。
-        const tailLen = cs.d * 0.42;
+        const tailLen = cs.d * 0.95;
 
         if (!tailInited) {
           for (let i = 0; i <= TAIL_SEG; i++) tailPath.push(_cometWorld.clone());
@@ -1580,6 +1649,27 @@
         const side = tailPerp.clone();
         const up2 = new THREE.Vector3().crossVectors(tailAxis, tailPerp).normalize();
 
+        /* ── 拖尾（Sprite）──────────────────────────────────────
+         * 长度/宽度都用"到镜头的距离"换算，保证任何机位下
+         * 屏幕上的观感一致（约 29° 长、2° 宽）。
+         * 旋转角用 tailAxis 在屏幕平面的分量算出来 ——
+         * 注意 viewUp 实际指向屏幕下方（叉积手性），所以 Y 取反。 */
+        {
+          const len = cs.d * 0.55;
+          const wid = cs.d * 0.035;
+          const dx = tailAxis.dot(viewRgt);
+          const dyUp = -tailAxis.dot(viewUp);
+          /* 用 center 把锚点钉在贴图的【左端】，
+             这样 sprite 的位置就是彗核本身，不需要再手动偏移半个长度。
+             之前用默认 center(0.5,0.5) + 手动偏移，结果整条拖尾
+             偏离彗核整整一个长度。 */
+          cometWake.center.set(0, 0.5);
+          cometWake.position.copy(_cometWorld);
+          cometWake.scale.set(len, wid, 1);
+          cometWake.material.rotation = Math.atan2(dyUp, dx);
+          // 贴图从彗核端开始，所以要把中心挪到一半处（上面已做）
+        }
+
         const buildTail = (
           t: Tail,
           wobble: number,
@@ -1588,7 +1678,7 @@
           for (let i = 0; i <= TAIL_SEG; i++) {
             const f = i / TAIL_SEG;             // 0 = 彗核, 1 = 尾梢
             // 尾流呈锥形张开：越远越宽，这是高速物体尾迹的形态
-            const spread = (0.002 + f * 0.028) * t.width * cs.d;
+            const spread = (0.0012 + f * 0.010) * t.width * cs.d;
             const base = _cometWorld
               .clone()
               .addScaledVector(tailAxis, f * tailLen * lenScale)
@@ -1597,7 +1687,7 @@
             const p1 = base.clone().addScaledVector(tailPerp, -spread);
             t.pos.set([p0.x, p0.y, p0.z], i * 6);
             t.pos.set([p1.x, p1.y, p1.z], i * 6 + 3);
-            const a = Math.pow(1 - f, 1.35);
+            const a = Math.pow(1 - f, 0.95);
             const [r, g, b] = t.rgb;
             t.col.set([r * a, g * a, b * a], i * 6);
             t.col.set([r * a, g * a, b * a], i * 6 + 3);
