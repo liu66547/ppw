@@ -1,28 +1,65 @@
 ---
 /**
- * 技术栈标签墙 —— 首屏下方
- * 按类别横向排开，让面试官快速扫一眼"这个人的工具面有多宽"
+ * 技术栈板块
+ *
+ * 设计思路（重做）：
+ *   原来是一行一行的 <dl> 平铺 —— 信息是对的，但看起来像一张表格，
+ *   面试官扫过去没有"一眼看懂工具面有多宽"的印象。
+ *
+ *   现在改成【分层技术栈】的视觉：
+ *     · 每条一个 lane，左侧序号 + 分类，右侧标签群
+ *     · lane 之间有分隔线，形成"层"的节奏
+ *     · 悬停时该行的强调色条从左侧长出来，鼠标扫过时整块有呼吸感
+ *     · 顶部先给结论（几类 / 多少项），再给细节
+ *
+ *   亮度上做了两件事：
+ *     1. 去掉原来的 bg-ink-900/50 —— 那层 50% 深色底会把整块压暗，
+ *        与其他透明板块对比明显发闷（footer 之前是同一个问题）
+ *     2. 分类标签从 fog-500 提到 fog-50，标签文字提到 fog-200
  */
 import { techStack } from '../data/profile';
+
+const total = techStack.groups.reduce((n, g) => n + g.items.length, 0);
+const alsoCount = techStack.also.length;
 ---
 
-<section id="stack" class="tilt-in border-y border-ink-800 bg-ink-900/50">
-  <div class="wrap py-10 md:py-12">
-    <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
-      <p class="eyebrow reveal">Tech Stack</p>
-      <p class="reveal mono text-xs text-fog-500">按类别排布，均来自实际项目</p>
+<section id="stack" class="tilt-in border-y border-ink-800">
+  <div class="wrap py-12 md:py-16">
+    <!-- 头部：先给结论（几类、多少项），再给细节 -->
+    <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+      <div class="reveal">
+        <p class="eyebrow">Tech Stack</p>
+        <h2 class="mt-3 text-2xl font-bold tracking-tight text-fog-50 md:text-3xl">
+          每天在用的技术栈
+        </h2>
+      </div>
+      <p class="reveal mono flex items-baseline gap-3 text-xs text-fog-400">
+        <span>
+          <span class="text-lg font-bold text-accent-300">{techStack.groups.length}</span>
+          类
+        </span>
+        <span class="text-ink-600">/</span>
+        <span>
+          <span class="text-lg font-bold text-accent-300">{total}</span>
+          项
+        </span>
+        <span class="text-ink-600">/</span>
+        <span>另了解 {alsoCount} 项</span>
+      </p>
     </div>
 
-    <dl class="mt-8 space-y-5">
+    <!-- 主体：分层 lane -->
+    <dl class="tech-lanes reveal mt-9">
       {
-        techStack.groups.map((g) => (
-          <div class="reveal flex flex-col gap-2 sm:flex-row sm:items-baseline sm:gap-5">
-            <dt class="mono w-20 shrink-0 text-xs uppercase tracking-wider text-fog-500">
-              {g.label}
-            </dt>
-            <dd class="flex flex-wrap gap-1.5">
+        techStack.groups.map((g, i) => (
+          <div class="tech-lane">
+            <span class="tech-idx mono" aria-hidden="true">
+              {String(i + 1).padStart(2, '0')}
+            </span>
+            <dt class="tech-label">{g.label}</dt>
+            <dd class="tech-chips">
               {g.items.map((item) => (
-                <span class="chip">{item}</span>
+                <span class="tech-chip">{item}</span>
               ))}
             </dd>
           </div>
@@ -30,13 +67,152 @@ import { techStack } from '../data/profile';
       }
     </dl>
 
-    <p class="reveal mt-6 flex flex-wrap items-baseline gap-2 text-xs text-fog-500">
-      <span class="mono uppercase tracking-wider">另有了解</span>
-      {
-        techStack.also.map((item) => (
-          <span class="text-fog-400">{item}</span>
-        ))
-      }
+    <!-- 另了解：刻意弱化，但不再"看不见" -->
+    <p class="reveal mt-9 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-ink-800/80 pt-6">
+      <span class="mono text-[11px] uppercase tracking-widest text-fog-400">另有了解</span>
+      {techStack.also.map((item) => <span class="tech-also">{item}</span>)}
     </p>
   </div>
 </section>
+
+<style>
+  .tech-lanes {
+    display: grid;
+    gap: 0;
+  }
+
+  .tech-lane {
+    position: relative;
+    display: grid;
+    /* 序号 | 分类 | 标签群 */
+    grid-template-columns: 2.25rem 7rem 1fr;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.85rem 0.25rem;
+    border-top: 1px solid rgba(38, 51, 74, 0.55);
+    transition: background-color 0.28s ease;
+  }
+  .tech-lane:last-child {
+    border-bottom: 1px solid rgba(38, 51, 74, 0.55);
+  }
+
+  /* 悬停时整行轻微提亮，并让强调色条从左侧长出来 */
+  .tech-lane::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.85rem;
+    bottom: 0.85rem;
+    width: 2px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, var(--color-accent-300), var(--color-accent-600));
+    transform: scaleY(0);
+    transform-origin: top;
+    transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .tech-lane:hover {
+    background-color: rgba(20, 184, 166, 0.045);
+  }
+  .tech-lane:hover::before {
+    transform: scaleY(1);
+  }
+
+  /* 序号：等宽数字，弱到只是节奏标记 */
+  .tech-idx {
+    font-size: 0.6875rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.08em;
+    color: rgba(94, 234, 212, 0.78);
+    transition: color 0.28s ease;
+  }
+  .tech-lane:hover .tech-idx {
+    color: var(--color-accent-300);
+  }
+
+  /* 分类名：这是"一眼看懂"的关键，必须亮 */
+  .tech-label {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: #ffffff;
+    letter-spacing: 0.01em;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  }
+
+  .tech-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  /* 标签：玻璃小胶囊，底比页面略亮一档，边界清楚 */
+  .tech-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    padding: 0.28rem 0.7rem;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: #e9f0fa;
+    background: linear-gradient(
+      180deg,
+      rgba(52, 70, 100, 0.55) 0%,
+      rgba(24, 34, 52, 0.7) 100%
+    );
+    border: 1px solid rgba(86, 112, 150, 0.6);
+    box-shadow: inset 0 1px 0 rgba(190, 220, 255, 0.06);
+    transition:
+      color 0.22s ease,
+      border-color 0.22s ease,
+      background 0.22s ease,
+      transform 0.22s ease;
+  }
+  .tech-chip:hover {
+    color: #ffffff;
+    border-color: rgba(94, 234, 212, 0.5);
+    background: linear-gradient(
+      180deg,
+      rgba(20, 184, 166, 0.16) 0%,
+      rgba(18, 26, 40, 0.6) 100%
+    );
+    transform: translateY(-1px);
+  }
+
+  /* 另了解：比主标签暗一档，但仍清楚可读 */
+  .tech-also {
+    border-radius: 9999px;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.8125rem;
+    color: #c3cddd;
+    border: 1px dashed rgba(86, 112, 150, 0.7);
+  }
+
+  /* ── 窄屏：序号与分类并到一行，标签换行铺满 ─────────────── */
+  @media (max-width: 640px) {
+    .tech-lane {
+      grid-template-columns: 1.6rem 1fr;
+      grid-template-areas:
+        'idx label'
+        'chips chips';
+      row-gap: 0.6rem;
+      padding: 0.9rem 0.25rem;
+    }
+    .tech-idx {
+      grid-area: idx;
+    }
+    .tech-label {
+      grid-area: label;
+    }
+    .tech-chips {
+      grid-area: chips;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tech-lane,
+    .tech-chip,
+    .tech-idx,
+    .tech-lane::before {
+      transition: none;
+    }
+  }
+</style>

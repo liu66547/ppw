@@ -4,85 +4,85 @@
       "name": "desktop-01.png",
       "y": 0,
       "pct": 0,
-      "kb": 517
+      "kb": 475
     },
     {
       "name": "desktop-02.png",
-      "y": 398,
+      "y": 415,
       "pct": 8,
-      "kb": 368
+      "kb": 425
     },
     {
       "name": "desktop-03.png",
-      "y": 797,
+      "y": 830,
       "pct": 15,
-      "kb": 346
+      "kb": 440
     },
     {
       "name": "desktop-04.png",
-      "y": 1195,
+      "y": 1246,
       "pct": 23,
-      "kb": 753
+      "kb": 665
     },
     {
       "name": "desktop-05.png",
-      "y": 1594,
+      "y": 1661,
       "pct": 31,
-      "kb": 836
+      "kb": 841
     },
     {
       "name": "desktop-06.png",
-      "y": 1992,
+      "y": 2076,
       "pct": 38,
-      "kb": 843
+      "kb": 847
     },
     {
       "name": "desktop-07.png",
-      "y": 2391,
+      "y": 2491,
       "pct": 46,
-      "kb": 691
+      "kb": 722
     },
     {
       "name": "desktop-08.png",
-      "y": 2789,
+      "y": 2907,
       "pct": 54,
-      "kb": 488
+      "kb": 522
     },
     {
       "name": "desktop-09.png",
-      "y": 3188,
+      "y": 3322,
       "pct": 62,
-      "kb": 370
+      "kb": 372
     },
     {
       "name": "desktop-10.png",
-      "y": 3586,
+      "y": 3737,
       "pct": 69,
-      "kb": 378
+      "kb": 381
     },
     {
       "name": "desktop-11.png",
-      "y": 3985,
+      "y": 4152,
       "pct": 77,
-      "kb": 543
+      "kb": 575
     },
     {
       "name": "desktop-12.png",
-      "y": 4383,
+      "y": 4568,
       "pct": 85,
-      "kb": 318
+      "kb": 335
     },
     {
       "name": "desktop-13.png",
-      "y": 4782,
+      "y": 4983,
       "pct": 92,
-      "kb": 433
+      "kb": 437
     },
     {
       "name": "desktop-14.png",
-      "y": 5180,
+      "y": 5398,
       "pct": 100,
-      "kb": 523
+      "kb": 521
     }
   ],
   "mobile": [
@@ -90,35 +90,35 @@
       "name": "mobile-01.png",
       "y": 0,
       "pct": 0,
-      "kb": 177
+      "kb": 179
     },
     {
       "name": "mobile-02.png",
-      "y": 1675,
+      "y": 1725,
       "pct": 20,
-      "kb": 284
+      "kb": 268
     },
     {
       "name": "mobile-03.png",
-      "y": 3350,
+      "y": 3449,
       "pct": 40,
-      "kb": 300
+      "kb": 303
     },
     {
       "name": "mobile-04.png",
-      "y": 5026,
+      "y": 5174,
       "pct": 60,
-      "kb": 139
+      "kb": 146
     },
     {
       "name": "mobile-05.png",
-      "y": 6701,
+      "y": 6898,
       "pct": 80,
-      "kb": 110
+      "kb": 113
     },
     {
       "name": "mobile-06.png",
-      "y": 8376,
+      "y": 8623,
       "pct": 100,
       "kb": 163
     }
