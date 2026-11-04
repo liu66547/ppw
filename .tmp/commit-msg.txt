@@ -1,30 +1,47 @@
-创生之柱改用真实 Hubble 照片（程序化版本完全不像）
+补完 B 站 UI 自动化项目页：改用仓库源码的真实内容
 
-用户反馈：我上一版做的"创生之柱"是一团灰楔形，跟真实结构毫无关系；
-他要的是第二、三张图那样的真实星云柱体。
+依据用户提供的 UITestA 工程重写项目页。
+原文案有多处与代码对不上，一并纠正。
 
-结论：星云柱的丝状细节只能来自照片，程序化 sprite 叠不出来。
-（上一版用 8 层递减宽度的星云 Sprite 拼柱体，实测出来是灰楔形。）
+一、用真实执行记录替换模糊/占位表述
+   target/surefire-reports/TestSuite.txt：
+     Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 10.69 s
+   target/allure-results：3 条 passed
+     - homePageShouldLoad
+     - searchShouldLoadSearchPage
+     - searchShouldShowEmptyStateForUserTab
+   所以用例数是【3 条】；逐条耗时 1.34s / 2.46s / 3.37s（来自 emailable-report）。
 
-改法：
-  · 删掉整套程序化柱体（含底部尘埃带）
-  · 换成 ESA/Hubble 的 heic1501a（Pillars of Creation, 2015）
-    Credit: NASA, ESA/Hubble and the Hubble Heritage Team
-    这是公有/可自由使用的素材，已保留署名
-  · 作为一张大尺寸 Sprite 放在 (30000, 15000, 130000)，
-    即首幕右上方极远处，不压正文
-  · 加色混合：照片黑底不会叠出方块
-  · opacity 0.46，是"远处有什么"的暗示，不抢太阳系
+二、删除全部"待完成"类内容（用户明确要求不要出现这类字样）
+   · status: in-progress -> completed，删除 statusNote
+   · 删除「后续规划」整节（原本是三条 [ ] 勾选框）
+   · 删除「项目状态：优化中，正在扩充用例覆盖范围」
+   · evidence 里"截图与报告待补充"改成三条真实证据
+   · 用例覆盖删掉代码中不存在的"视频详情""结果页跳转"，
+     改为与测试类一一对应的 3 条
+   · 新增「设计取舍」，把原来的"规划"换成已经做出的取舍
+     （免登录范围、Allure 2.x 版本对齐、并行度保持串行）
 
-顺带解决的一个问题：
-  JPEG 没有透明通道，照片的星云填满整个画面，
-  加色混合后在纯黑星空里会显出一个矩形边。
-  做法是图片加载后绘制到 canvas，用 destination-in + 径向渐变
-  把四周 alpha 抹掉，再替换 Sprite 的贴图。
-  遮罩收到 0.46 倍最大边长就完全透明，矩形边消失。
+三、按源码补全技术细节
+   · 技术栈补真实版本：Java 21（maven.compiler.release）、Selenium 4.51.0、
+     TestNG 7.12.0、WebDriverManager 6.4.0、Allure 2.35.5、
+     surefire 3.5.6（testFailureIgnore=false）、SLF4J 2.0.20
+   · 架构节按实际包结构写：common/ConfigReader、core/{DriverFactory,BasePage,
+     BaseTest,AllureListener}、pages/{BilibiliHomePage,BilibiliSearchPage}、tests
+   · 「元素查找：多定位符兜底」写明 BasePage#find 的四个设计点
+   · 等待策略：零 sleep，全部显式条件（可见/可点击/URL 变化/新窗口句柄）
+   · 用例隔离：@BeforeMethod 建驱动 + @AfterMethod(alwaysRun=true) 必关
 
-体积变化：
-  新增 pillars_a.jpg 290 KB，dist 从 3273 KB -> 3531 KB。
+四、加入真实截图（没有图就不显示，这次有真图）
+   从 target/surefire-reports 的两个 HTML 报告渲染截图并裁掉空白：
+     · bilibili-testng-summary.png  900x328   39 KB  执行摘要
+     · bilibili-testng-report.png   1280x492  20 KB  报告总览
+   均带 alt 与 caption，分组「执行结果」。
+
+五、复核结果
+   页面内已无 待完成/待补充/TODO/进行中/后续规划/[ ] 字样；
+   dist 里两张图 HTTP 200；
+   项目页标题、已完成徽章、数据卡片（3/3、0、10.7s、2 层）渲染正常。
 
 验证：GLSL 静态检查 4 对着色器、交付验收 24 项、3D 背景 21 项、
 移动端 17 项、降级路径 3/3、横向滚动 4 项、原有功能 80 项 全部通过。

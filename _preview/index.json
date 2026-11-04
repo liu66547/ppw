@@ -4,83 +4,83 @@
       "name": "desktop-01.png",
       "y": 0,
       "pct": 0,
-      "kb": 556
+      "kb": 496
     },
     {
       "name": "desktop-02.png",
       "y": 418,
       "pct": 8,
-      "kb": 486
+      "kb": 463
     },
     {
       "name": "desktop-03.png",
-      "y": 836,
+      "y": 837,
       "pct": 15,
-      "kb": 470
-    },
-    {
-      "name": "desktop-04.png",
-      "y": 1253,
-      "pct": 23,
-      "kb": 683
-    },
-    {
-      "name": "desktop-05.png",
-      "y": 1671,
-      "pct": 31,
-      "kb": 960
-    },
-    {
-      "name": "desktop-06.png",
-      "y": 2089,
-      "pct": 38,
-      "kb": 993
-    },
-    {
-      "name": "desktop-07.png",
-      "y": 2507,
-      "pct": 46,
-      "kb": 778
-    },
-    {
-      "name": "desktop-08.png",
-      "y": 2924,
-      "pct": 54,
-      "kb": 579
-    },
-    {
-      "name": "desktop-09.png",
-      "y": 3342,
-      "pct": 62,
       "kb": 467
     },
     {
+      "name": "desktop-04.png",
+      "y": 1255,
+      "pct": 23,
+      "kb": 680
+    },
+    {
+      "name": "desktop-05.png",
+      "y": 1674,
+      "pct": 31,
+      "kb": 949
+    },
+    {
+      "name": "desktop-06.png",
+      "y": 2092,
+      "pct": 38,
+      "kb": 1007
+    },
+    {
+      "name": "desktop-07.png",
+      "y": 2510,
+      "pct": 46,
+      "kb": 748
+    },
+    {
+      "name": "desktop-08.png",
+      "y": 2929,
+      "pct": 54,
+      "kb": 534
+    },
+    {
+      "name": "desktop-09.png",
+      "y": 3347,
+      "pct": 62,
+      "kb": 378
+    },
+    {
       "name": "desktop-10.png",
-      "y": 3760,
+      "y": 3765,
       "pct": 69,
-      "kb": 390
+      "kb": 397
     },
     {
       "name": "desktop-11.png",
-      "y": 4178,
+      "y": 4184,
       "pct": 77,
-      "kb": 585
+      "kb": 621
     },
     {
       "name": "desktop-12.png",
-      "y": 4595,
+      "y": 4602,
       "pct": 85,
-      "kb": 346
+      "kb": 378
     },
     {
       "name": "desktop-13.png",
-      "y": 5013,
+      "y": 5021,
       "pct": 92,
-      "kb": 446
+      "kb": 443
     },
     {
       "name": "desktop-14.png",
-      "y": 5431,
+      "y": 5439,
       "pct": 100,
       "kb": 535
     }
@@ -90,37 +90,37 @@
       "name": "mobile-01.png",
       "y": 0,
       "pct": 0,
-      "kb": 227
+      "kb": 208
     },
     {
       "name": "mobile-02.png",
-      "y": 1731,
+      "y": 1741,
       "pct": 20,
-      "kb": 258
+      "kb": 261
     },
     {
       "name": "mobile-03.png",
-      "y": 3462,
+      "y": 3482,
       "pct": 40,
-      "kb": 342
+      "kb": 347
     },
     {
       "name": "mobile-04.png",
-      "y": 5194,
+      "y": 5222,
       "pct": 60,
-      "kb": 151
+      "kb": 150
     },
     {
       "name": "mobile-05.png",
-      "y": 6925,
+      "y": 6963,
       "pct": 80,
-      "kb": 114
+      "kb": 113
     },
     {
       "name": "mobile-06.png",
-      "y": 8656,
+      "y": 8704,
       "pct": 100,
-      "kb": 164
+      "kb": 165
     }
   ],
   "url": "http://127.0.0.1:4180/"
