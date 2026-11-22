@@ -5,7 +5,6 @@
 import '../styles/global.css';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
-import ResumePreview from '../components/ResumePreview.astro';
 import DeepSpaceIntro from '../components/DeepSpaceIntro.astro';
 import { site } from '../data/profile';
 
@@ -85,8 +84,7 @@ const isHome = Astro.url.pathname === '/';
 
     <Footer />
 
-    <!-- 简历在线预览弹层：全局挂载一次，任何带 data-resume-preview 的按钮都能唤起 -->
-    <ResumePreview />
+    <!-- 简历预览弹层已下线（找到工作后不再对外提供简历） -->
 
     <script>
       // 滚动入场动画：元素进入视口时淡入

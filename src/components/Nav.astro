@@ -58,33 +58,8 @@ const toHref = (href: string) => (isHome ? href.replace('/', '') : href);
       }
     </nav>
 
-    <!-- 右：简历预览 + 下载 + 移动端菜单 -->
+    <!-- 右：移动端菜单（简历入口已下线） -->
     <div class="flex items-center gap-2">
-      <button
-        type="button"
-        data-resume-preview
-        class="btn btn-ghost hidden !px-3.5 !py-2 !text-[13px] sm:inline-flex"
-      >
-        <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
-          <circle cx="12" cy="12" r="3" />
-        </svg>
-        预览简历
-      </button>
-
-      <a
-        href={profile.contact.resumeFile}
-        download
-        class="btn btn-primary hidden !px-3.5 !py-2 !text-[13px] sm:inline-flex"
-      >
-        <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-          <polyline points="7 10 12 15 17 10" />
-          <line x1="12" y1="15" x2="12" y2="3" />
-        </svg>
-        下载简历
-      </a>
-
       <details class="relative md:hidden">
         <summary
           class="grid size-9 cursor-pointer list-none place-items-center rounded-lg border border-ink-700 bg-ink-850 text-fog-200 transition-colors hover:border-accent-500 hover:text-accent-300 [&::-webkit-details-marker]:hidden"
@@ -110,20 +85,6 @@ const toHref = (href: string) => (isHome ? href.replace('/', '') : href);
               </a>
             ))
           }
-          <button
-            type="button"
-            data-resume-preview
-            class="mt-1 block w-full rounded-lg border border-ink-600 px-3 py-2 text-left text-sm text-fog-200 transition-colors hover:border-accent-500 hover:text-accent-300"
-          >
-            在线预览简历
-          </button>
-          <a
-            href={profile.contact.resumeFile}
-            download
-            class="mt-1 block rounded-lg bg-accent-500/90 px-3 py-2 text-sm font-semibold text-ink-950"
-          >
-            下载简历
-          </a>
         </nav>
       </details>
     </div>

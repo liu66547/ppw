@@ -1,47 +1,34 @@
-补完 B 站 UI 自动化项目页：改用仓库源码的真实内容
+下线简历：网站不再提供预览与下载
 
-依据用户提供的 UITestA 工程重写项目页。
-原文案有多处与代码对不上，一并纠正。
+用户已找到工作，希望保留网站但不再对外暴露简历。这次把「入口」和「文件」
+两层都处理掉 —— 只删按钮是不够的，/resume.pdf 这个 URL 仍然能直接下载。
 
-一、用真实执行记录替换模糊/占位表述
-   target/surefire-reports/TestSuite.txt：
-     Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 10.69 s
-   target/allure-results：3 条 passed
-     - homePageShouldLoad
-     - searchShouldLoadSearchPage
-     - searchShouldShowEmptyStateForUserTab
-   所以用例数是【3 条】；逐条耗时 1.34s / 2.46s / 3.37s（来自 emailable-report）。
+代码侧改动：
+  · Nav.astro      删除「预览简历」+「下载简历」两个按钮（桌面端与移动端菜单）
+  · Hero.astro     删除「在线预览简历」+「下载简历 PDF」两个按钮
+  · Footer.astro   删除「在线预览简历」+「下载简历 PDF」两个按钮
+  · pages/projects/[...slug].astro
+                   删除项目页右侧栏底部的「下载简历 PDF」按钮
+  · BaseLayout.astro  移除 ResumePreview 的挂载与 import
+  · 删除 src/components/ResumePreview.astro（预览弹层组件，已无引用）
+  · profile.ts     移除 contact.resumeFile 字段，注释里写明为何下线、如何恢复
+  · 删除 public/resume.pdf（git rm）
 
-二、删除全部"待完成"类内容（用户明确要求不要出现这类字样）
-   · status: in-progress -> completed，删除 statusNote
-   · 删除「后续规划」整节（原本是三条 [ ] 勾选框）
-   · 删除「项目状态：优化中，正在扩充用例覆盖范围」
-   · evidence 里"截图与报告待补充"改成三条真实证据
-   · 用例覆盖删掉代码中不存在的"视频详情""结果页跳转"，
-     改为与测试类一一对应的 3 条
-   · 新增「设计取舍」，把原来的"规划"换成已经做出的取舍
-     （免登录范围、Allure 2.x 版本对齐、并行度保持串行）
+验收脚本同步修正：
+  acceptance_check 里原来硬编码「必须有 PDF」的检查，现在改成跟着站点意图走：
+    profile 里有 resumeFile  -> 必须存在可用 PDF（否则按钮 404）
+    profile 里没有 resumeFile -> 不允许还有 PDF（防止漏删）
+  两个方向都实测过：无 PDF 时通过；故意拷一个 PDF 回去会报
+  「profile 里已删除 resumeFile，但 public/ 里仍有 PDF」。
 
-三、按源码补全技术细节
-   · 技术栈补真实版本：Java 21（maven.compiler.release）、Selenium 4.51.0、
-     TestNG 7.12.0、WebDriverManager 6.4.0、Allure 2.35.5、
-     surefire 3.5.6（testFailureIgnore=false）、SLF4J 2.0.20
-   · 架构节按实际包结构写：common/ConfigReader、core/{DriverFactory,BasePage,
-     BaseTest,AllureListener}、pages/{BilibiliHomePage,BilibiliSearchPage}、tests
-   · 「元素查找：多定位符兜底」写明 BasePage#find 的四个设计点
-   · 等待策略：零 sleep，全部显式条件（可见/可点击/URL 变化/新窗口句柄）
-   · 用例隔离：@BeforeMethod 建驱动 + @AfterMethod(alwaysRun=true) 必关
+浏览器实测（headless）：
+  首页 innerText 不含「简历」；无任何 href*=resume 或 data-resume-preview 元素；
+  项目页 HTML 不含 resume.pdf / 下载简历 / 预览简历；
+  /resume.pdf 返回 404。
 
-四、加入真实截图（没有图就不显示，这次有真图）
-   从 target/surefire-reports 的两个 HTML 报告渲染截图并裁掉空白：
-     · bilibili-testng-summary.png  900x328   39 KB  执行摘要
-     · bilibili-testng-report.png   1280x492  20 KB  报告总览
-   均带 alt 与 caption，分组「执行结果」。
+仍需在线上手动执行的一步（代码改不到）：
+  到 OSS Bucket 删除根目录的 resume.pdf —— 否则 https://len666.top/resume.pdf
+  依然能直接下载（实测当前线上仍是 200 / 274,986 bytes）。
 
-五、复核结果
-   页面内已无 待完成/待补充/TODO/进行中/后续规划/[ ] 字样；
-   dist 里两张图 HTTP 200；
-   项目页标题、已完成徽章、数据卡片（3/3、0、10.7s、2 层）渲染正常。
-
-验证：GLSL 静态检查 4 对着色器、交付验收 24 项、3D 背景 21 项、
-移动端 17 项、降级路径 3/3、横向滚动 4 项、原有功能 80 项 全部通过。
+验证：GLSL 静态检查 4 对着色器、交付验收 24 项、3D 背景 21 项、移动端 17 项、
+降级路径 3/3、横向滚动 4 项、原有功能 80 项 全部通过。

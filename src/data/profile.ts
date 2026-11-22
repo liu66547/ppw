@@ -53,14 +53,15 @@ export const profile = {
     githubHandle: 'liu66547',
     gitee: 'https://gitee.com/liu66547',
     giteeHandle: 'liu66547',
-    /**
-     * 简历 PDF。
+    /*
+     * 简历 PDF 已下线。
      *
-     * 文件名故意用 ASCII 的 resume.pdf —— 中文文件名在 URL 里要编码，
-     * 部分浏览器和 CDN 处理不一致，可能出现「点了下载没反应」。
-     * 换简历时把新 PDF 重命名成 resume.pdf 覆盖 public/ 里那个即可，不用改代码。
+     * 找到工作后不再需要对外提供简历，所以：
+     *   · 删掉了 public/resume.pdf
+     *   · 删掉了 Nav / Hero / Footer 上的预览与下载入口
+     *   · 删掉了 ResumePreview 弹层组件
+     * 如果以后需要恢复，把 PDF 放回 public/ 并在这里加回 resumeFile 字段即可。
      */
-    resumeFile: '/resume.pdf',
   },
 
   /** 教育背景 */

@@ -138,20 +138,37 @@ for asset in ['favicon.svg', 'robots.txt', 'sitemap.xml']:
     else:
         fail('%s 缺失' % asset)
 
+# 简历 PDF：现在有两种合法状态，检查要跟着站点意图走 ——
+#   ① 站点提供了简历入口 → 必须存在可用的 resume.pdf（否则按钮 404）
+#   ② 站点没有简历入口（已找到工作，刻意下线）→ 不应该还留着 PDF
+#   判断依据是源码里是否还有 resumeFile 字段，而不是硬编码某一个状态。
 pdfs = [f for f in os.listdir(ROOT) if f.lower().endswith('.pdf')]
-if len(pdfs) == 1:
-    pdf = os.path.join(ROOT, pdfs[0])
-    size = os.path.getsize(pdf)
-    with open(pdf, 'rb') as f:
-        head = f.read(5)
-    if head == b'%PDF-' and size > 50000:
-        ok('简历 PDF 完整可下载：%s (%.0f KB)' % (pdfs[0], size / 1024))
+
+_profile = os.path.join(ROOT.replace('dist', 'src'), 'data', 'profile.ts')
+_has_resume_field = False
+if os.path.exists(_profile):
+    with open(_profile, encoding='utf-8') as f:
+        _has_resume_field = 'resumeFile:' in f
+
+if _has_resume_field:
+    if len(pdfs) == 1:
+        pdf = os.path.join(ROOT, pdfs[0])
+        size = os.path.getsize(pdf)
+        with open(pdf, 'rb') as f:
+            head = f.read(5)
+        if head == b'%PDF-' and size > 50000:
+            ok('简历 PDF 完整可下载：%s (%.0f KB)' % (pdfs[0], size / 1024))
+        else:
+            fail('简历 PDF 损坏：head=%r size=%d' % (head, size))
+    elif not pdfs:
+        fail('profile 里声明了 resumeFile，但 public/ 里没有 PDF（按钮会 404）')
     else:
-        fail('简历 PDF 损坏：head=%r size=%d' % (head, size))
-elif not pdfs:
-    fail('public/ 里没有简历 PDF，「下载简历」按钮会 404')
+        warn('有多个 PDF：%s' % pdfs)
 else:
-    warn('有多个 PDF：%s' % pdfs)
+    if not pdfs:
+        ok('简历已下线：无 PDF、无下载入口（与 profile 声明一致）')
+    else:
+        fail('profile 里已删除 resumeFile，但 public/ 里仍有 PDF：%s（应一并删掉）' % pdfs)
 
 fonts = [f for f in os.listdir(os.path.join(ROOT, '_astro')) if f.endswith('.woff2')]
 if fonts:

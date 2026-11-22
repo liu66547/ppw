@@ -1,0 +1,229 @@
+<!DOCTYPE html><html lang="zh-CN"> <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="generator" content="Astro v5.18.2"><title>B 站 Web 端 · UI 自动化测试 · 啉 · 个人介绍</title><meta name="description" content="以 B 站 Web 端为被测对象构建 UI 自动化工程。BasePage 统一封装「CSS 优先、XPath 兜底」的多定位符查找与显式等待，页面类只描述元素与行为，用例层只描述断言；失败自动截图接入 Allure，执行记录可从 TestNG 报告复核。"><link rel="canonical" href="https://len666.top/projects/bilibili-ui-test/"><!-- 社交分享卡片 --><meta property="og:type" content="website"><meta property="og:title" content="B 站 Web 端 · UI 自动化测试 · 啉 · 个人介绍"><meta property="og:description" content="以 B 站 Web 端为被测对象构建 UI 自动化工程。BasePage 统一封装「CSS 优先、XPath 兜底」的多定位符查找与显式等待，页面类只描述元素与行为，用例层只描述断言；失败自动截图接入 Allure，执行记录可从 TestNG 报告复核。"><meta property="og:url" content="https://len666.top/projects/bilibili-ui-test/"><meta name="twitter:card" content="summary_large_image"><meta name="theme-color" content="#05070d"><!--
+      兜底：入场动画的元素默认 opacity:0，靠 JS 加 .is-visible 才显示。
+      万一浏览器禁用或加载不了 JS，这里强制全部可见 —— 内容永远不能被脚本"扣住"。
+    --><noscript><style>
+        .reveal {
+          opacity: 1 !important;
+          transform: none !important;
+        }
+      </style></noscript><link rel="stylesheet" href="/_astro/index.DLbo4BDq.css"></head> <body class="min-h-screen antialiased"> <!-- 全页共用的背景光晕（极慢漂移 + 呼吸），详细设计取舍见 global.css。
+         注意：3D 背景启用时该光晕会被组件临时收掉，避免与星云重复叠加。 --> <div class="aurora" aria-hidden="true"></div> <!-- 全页太阳系流星 3D 背景：画布固定在最底层，滚动进度驱动三幕镜头 --> <div id="ds-bg" aria-hidden="true" data-astro-cid-t6v5l4qd></div>  <script type="module" src="/_astro/DeepSpaceIntro.astro_astro_type_script_index_0_lang.Kr3Bo4bN.js"></script> <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-accent-500 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-ink-950">
+跳到主要内容
+</a> <header id="site-nav" class="sticky top-0 z-40 border-b border-ink-800/80 bg-ink-950/70 backdrop-blur-md transition-colors duration-300"> <!-- 阅读进度条：贴在导航底部，随滚动推进 --> <div id="read-progress" class="absolute inset-x-0 bottom-0 h-px origin-left scale-x-0 bg-gradient-to-r from-accent-500 via-accent-400 to-azure-400" aria-hidden="true"></div> <div class="wrap flex h-16 items-center justify-between gap-4"> <!-- 左：站点标识 --> <a href="/" class="group flex items-center gap-2.5" aria-label="返回首页"> <span class="grid size-8 place-items-center rounded-lg border border-accent-500/40 bg-accent-500/10 font-mono text-[13px] font-bold text-accent-300 transition-colors group-hover:border-accent-400 group-hover:bg-accent-500/20"> 啉 </span> <span class="hidden text-sm font-semibold text-fog-50 sm:block">
+啉 · 个人介绍
+</span> </a> <!-- 中：桌面端导航 --> <nav class="hidden items-center gap-1 md:flex" aria-label="主导航"> <a href="/#stack" class="rounded-lg px-3 py-1.5 text-sm text-fog-400 transition-colors hover:bg-ink-850 hover:text-fog-50"> 技术栈 </a><a href="/#skills" class="rounded-lg px-3 py-1.5 text-sm text-fog-400 transition-colors hover:bg-ink-850 hover:text-fog-50"> 技能 </a><a href="/#advantages" class="rounded-lg px-3 py-1.5 text-sm text-fog-400 transition-colors hover:bg-ink-850 hover:text-fog-50"> 优势 </a><a href="/#projects" class="rounded-lg px-3 py-1.5 text-sm text-fog-400 transition-colors hover:bg-ink-850 hover:text-fog-50"> 项目 </a><a href="/#contact" class="rounded-lg px-3 py-1.5 text-sm text-fog-400 transition-colors hover:bg-ink-850 hover:text-fog-50"> 联系 </a> </nav> <!-- 右：简历预览 + 下载 + 移动端菜单 --> <div class="flex items-center gap-2"> <button type="button" data-resume-preview class="btn btn-ghost hidden !px-3.5 !py-2 !text-[13px] sm:inline-flex"> <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"> <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"></path> <circle cx="12" cy="12" r="3"></circle> </svg>
+预览简历
+</button> <a href="/resume.pdf" download class="btn btn-primary hidden !px-3.5 !py-2 !text-[13px] sm:inline-flex"> <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path> <polyline points="7 10 12 15 17 10"></polyline> <line x1="12" y1="15" x2="12" y2="3"></line> </svg>
+下载简历
+</a> <details class="relative md:hidden"> <summary class="grid size-9 cursor-pointer list-none place-items-center rounded-lg border border-ink-700 bg-ink-850 text-fog-200 transition-colors hover:border-accent-500 hover:text-accent-300 [&::-webkit-details-marker]:hidden" aria-label="打开菜单"> <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"> <line x1="3" y1="6" x2="21" y2="6"></line> <line x1="3" y1="12" x2="21" y2="12"></line> <line x1="3" y1="18" x2="21" y2="18"></line> </svg> </summary> <nav class="absolute right-0 top-11 w-44 overflow-hidden rounded-xl border border-ink-700 bg-ink-900 p-1.5 shadow-2xl shadow-ink-950/80" aria-label="移动端导航"> <a href="/#stack" class="block rounded-lg px-3 py-2 text-sm text-fog-200 transition-colors hover:bg-ink-850 hover:text-accent-300"> 技术栈 </a><a href="/#skills" class="block rounded-lg px-3 py-2 text-sm text-fog-200 transition-colors hover:bg-ink-850 hover:text-accent-300"> 技能 </a><a href="/#advantages" class="block rounded-lg px-3 py-2 text-sm text-fog-200 transition-colors hover:bg-ink-850 hover:text-accent-300"> 优势 </a><a href="/#projects" class="block rounded-lg px-3 py-2 text-sm text-fog-200 transition-colors hover:bg-ink-850 hover:text-accent-300"> 项目 </a><a href="/#contact" class="block rounded-lg px-3 py-2 text-sm text-fog-200 transition-colors hover:bg-ink-850 hover:text-accent-300"> 联系 </a> <button type="button" data-resume-preview class="mt-1 block w-full rounded-lg border border-ink-600 px-3 py-2 text-left text-sm text-fog-200 transition-colors hover:border-accent-500 hover:text-accent-300">
+在线预览简历
+</button> <a href="/resume.pdf" download class="mt-1 block rounded-lg bg-accent-500/90 px-3 py-2 text-sm font-semibold text-ink-950">
+下载简历
+</a> </nav> </details> </div> </div> </header> <script type="module">const s=document.getElementById("site-nav");if(s){const e=()=>{const n=window.scrollY>12;s.classList.toggle("bg-ink-950/90",n),s.classList.toggle("bg-ink-950/70",!n),s.classList.toggle("border-ink-700",n)};e(),window.addEventListener("scroll",e,{passive:!0})}const i=document.getElementById("read-progress");if(i&&window.matchMedia("(prefers-reduced-motion: no-preference)").matches){let e=!1;const n=()=>{const o=document.documentElement.scrollHeight-window.innerHeight,r=o>0?window.scrollY/o:0;i.style.transform=`scaleX(${Math.min(1,Math.max(0,r))})`,e=!1},t=()=>{e||(e=!0,window.requestAnimationFrame(n))};n(),window.addEventListener("scroll",t,{passive:!0}),window.addEventListener("resize",t,{passive:!0}),"ResizeObserver"in window&&new ResizeObserver(t).observe(document.body),window.addEventListener("load",t,{once:!0}),document.querySelectorAll('img[loading="lazy"]').forEach(o=>{o.addEventListener("load",t,{once:!0})})}</script> <main id="main">   <div class="border-b border-ink-800 bg-ink-900/30"> <div class="wrap py-4"> <a href="/#projects" class="inline-flex items-center gap-1.5 text-sm text-fog-400 transition-colors hover:text-accent-300"> <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"> <line x1="19" y1="12" x2="5" y2="12"></line> <polyline points="12 19 5 12 12 5"></polyline> </svg>
+返回项目列表
+</a> </div> </div>  <header class="relative overflow-hidden border-b border-ink-800"> <div class="pointer-events-none absolute inset-0 bg-dots mask-fade" aria-hidden="true"></div> <div class="wrap relative py-12 md:py-16"> <div class="flex flex-wrap items-center gap-x-3 gap-y-2"> <span class="mono text-xs text-fog-500">2026.09 – 2026.10</span> <span class="rounded border border-pass/35 bg-pass/10 px-1.5 py-0.5 text-[11px] font-medium text-pass">
+已完成
+</span> <span class="text-[11px] text-fog-500">独立开发</span> </div> <h1 class="mt-4 max-w-3xl text-3xl font-bold leading-tight tracking-tight text-fog-50 md:text-4xl"> B 站 Web 端 · UI 自动化测试 </h1> <p class="mt-4 max-w-3xl text-sm leading-relaxed text-fog-200 md:text-base"> 以 B 站 Web 端为被测对象构建 UI 自动化工程。BasePage 统一封装「CSS 优先、XPath 兜底」的多定位符查找与显式等待，页面类只描述元素与行为，用例层只描述断言；失败自动截图接入 Allure，执行记录可从 TestNG 报告复核。 </p>  <!-- 技术栈 --> <ul class="mt-6 flex flex-wrap gap-1.5"> <li class="chip">Java</li><li class="chip">Selenium WebDriver</li><li class="chip">TestNG</li><li class="chip">Page Object</li><li class="chip">Allure</li> </ul> <!-- 关键数据 --> <dl class="mt-8 grid grid-cols-2 gap-x-6 gap-y-5 border-t border-ink-700 pt-6 sm:grid-cols-4"> <div> <dt class="mono text-xl font-bold text-accent-300 md:text-2xl">3 / 3</dt> <dd class="mt-0.5 text-xs text-fog-400">全量用例通过</dd> </div><div> <dt class="mono text-xl font-bold text-accent-300 md:text-2xl">0</dt> <dd class="mt-0.5 text-xs text-fog-400">失败 / 跳过</dd> </div><div> <dt class="mono text-xl font-bold text-accent-300 md:text-2xl">10.7s</dt> <dd class="mt-0.5 text-xs text-fog-400">全量执行耗时</dd> </div><div> <dt class="mono text-xl font-bold text-accent-300 md:text-2xl">2 层</dt> <dd class="mt-0.5 text-xs text-fog-400">定位兜底策略</dd> </div> </dl> <!-- 仓库链接 --> <div class="mt-7 flex flex-wrap gap-2.5"> <a href="https://github.com/liu66547" target="_blank" rel="noopener noreferrer" class="btn btn-ghost !px-3.5 !py-2 !text-[13px]"> <svg class="size-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"> <path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 0-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.2.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.1 0 4.7-2.8 5.7-5.5 6 .4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3Z"></path> </svg> GitHub </a> </div> </div> </header>  <section class="border-b border-ink-800 bg-ink-900/40"> <div class="wrap py-10 md:py-12"> <div class="grid gap-8 lg:grid-cols-[1.35fr_1fr]"> <!-- 左：一句话结论 + 要点 --> <div> <p class="eyebrow">TL;DR · 30 秒看懂</p> <p class="mt-4 text-lg font-semibold leading-relaxed text-fog-50 md:text-xl"> 页面改版时只需要改定位层，用例层一行不动。 </p> <ul class="mt-6 space-y-3.5"> <li class="flex gap-3 text-sm leading-relaxed text-fog-200"> <svg class="mt-0.5 size-4 shrink-0 text-accent-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"> <polyline points="20 6 9 17 4 12"></polyline> </svg> <span><strong>定位与断言彻底解耦</strong>：BasePage 收口所有元素查找，页面类只声明「有什么元素、能做什么」，用例层只写业务断言</span> </li><li class="flex gap-3 text-sm leading-relaxed text-fog-200"> <svg class="mt-0.5 size-4 shrink-0 text-accent-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"> <polyline points="20 6 9 17 4 12"></polyline> </svg> <span><strong>多定位符兜底</strong>：CSS 优先、XPath 兜底，每一轮轮询都从第一个定位符重试，单个定位符失效不会拖垮整条等待</span> </li><li class="flex gap-3 text-sm leading-relaxed text-fog-200"> <svg class="mt-0.5 size-4 shrink-0 text-accent-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"> <polyline points="20 6 9 17 4 12"></polyline> </svg> <span><strong>零 sleep</strong>：所有等待都走显式条件（元素可见 / 可点击 / URL 变化 / 新窗口句柄出现），不做固定时长硬等</span> </li><li class="flex gap-3 text-sm leading-relaxed text-fog-200"> <svg class="mt-0.5 size-4 shrink-0 text-accent-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"> <polyline points="20 6 9 17 4 12"></polyline> </svg> <span><strong>结果可复核</strong>：失败自动截图接入 Allure，`testFailureIgnore=false` 保证「通过率」这个数字不被掩盖</span> </li> </ul> </div> <!-- 右：证据索引 —— 想验证去哪儿看 --> <div class="lg:border-l lg:border-ink-700 lg:pl-8"> <p class="mono text-[11px] uppercase tracking-widest text-fog-500">
+想验证？去哪儿看
+</p> <ul class="mt-4 space-y-2.5"> <li> <div class="flex items-start gap-3 rounded-lg border border-ink-700 bg-ink-850 px-3.5 py-3"> <span class="min-w-0 flex-1"> <span class="block text-[13px] font-medium text-fog-100"> 执行结果 </span> <span class="mt-0.5 block text-[11px] leading-relaxed text-fog-500"> 全量 3 条用例、0 失败、0 跳过，耗时 10.7 秒（TestNG / Surefire 报告，见下方截图） </span> </span> </div> </li><li> <div class="flex items-start gap-3 rounded-lg border border-ink-700 bg-ink-850 px-3.5 py-3"> <span class="min-w-0 flex-1"> <span class="block text-[13px] font-medium text-fog-100"> 框架分层 </span> <span class="mt-0.5 block text-[11px] leading-relaxed text-fog-500"> core（BasePage / BaseTest / DriverFactory / AllureListener）+ pages（页面对象）+ tests（用例） </span> </span> </div> </li><li> <div class="flex items-start gap-3 rounded-lg border border-ink-700 bg-ink-850 px-3.5 py-3"> <span class="min-w-0 flex-1"> <span class="block text-[13px] font-medium text-fog-100"> 定位策略 </span> <span class="mt-0.5 block text-[11px] leading-relaxed text-fog-500"> BasePage#find 的多定位符轮询与异常重写，见「架构设计 · 元素查找」 </span> </span> </div> </li><li> <div class="flex items-start gap-3 rounded-lg border border-ink-700 bg-ink-850 px-3.5 py-3"> <span class="min-w-0 flex-1"> <span class="block text-[13px] font-medium text-fog-100"> 配置化 </span> <span class="mt-0.5 block text-[11px] leading-relaxed text-fog-500"> 浏览器 / 超时 / 测试数据全部走 config.properties，可用 -Dkey=value 临时覆盖 </span> </span> </div> </li> </ul> <p class="mt-4 text-[11px] leading-relaxed text-fog-500">
+所有数字与结论都能在以上来源中核对。
+</p> </div> </div> </div> </section> <div class="wrap py-12 md:py-16"> <div class="grid gap-12 lg:grid-cols-[minmax(0,1fr)_15rem]"> <article class="prose-tech min-w-0"> <h2 id="项目背景">项目背景</h2>
+<p><strong>被测系统</strong>：B 站 Web 端（动态渲染的现代前端应用，且搜索结果会在新窗口打开）。</p>
+<p><strong>要解决的问题</strong>：UI 自动化最容易烂在两件事上 ——</p>
+<ol>
+<li><strong>页面改版就全崩</strong>：定位写死在用例里，页面一改，所有用例一起红；</li>
+<li><strong>动态渲染带来的假失败</strong>：元素还没渲染就去点，报错但其实是等待策略没写对。</li>
+</ol>
+<p>所以这个项目的重点不在”覆盖多少条用例”，而在<strong>把定位与用例解耦</strong>、<strong>把等待做成框架能力</strong>，
+让用例数量增长时不会同时带来维护成本的增长。</p>
+<h2 id="技术栈">技术栈</h2>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>类别</th><th>选型</th><th>说明</th></tr></thead><tbody><tr><td>语言 / 运行时</td><td>Java 21</td><td><code>maven.compiler.release=21</code>，用 <code>release</code> 而非 <code>source/target</code>，会同时校验 API 可用性</td></tr><tr><td>浏览器驱动</td><td>Selenium WebDriver 4.51</td><td>官方 Java 封装，含 Selenium Manager</td></tr><tr><td>驱动匹配</td><td>WebDriverManager 6.4</td><td>按浏览器版本自动匹配 driver，双保险</td></tr><tr><td>测试框架</td><td>TestNG 7.12</td><td>套件、分组、监听器、<code>testng.xml</code> 指挥中心</td></tr><tr><td>设计模式</td><td>Page Object</td><td>定位与用例解耦的核心手段</td></tr><tr><td>测试报告</td><td>Allure 2.35 + allure-maven</td><td>依赖版本刻意与本机 Allure CLI 2.46 对齐，保证结果目录能被直接渲染</td></tr><tr><td>构建</td><td>Maven + Surefire 3.5</td><td><code>testFailureIgnore=false</code>，红叉不被掩盖</td></tr><tr><td>日志</td><td>SLF4J 2.0</td><td>门面 + 简单实现，后续可换 logback 而不动业务代码</td></tr></tbody></table>
+<h2 id="架构设计">架构设计</h2>
+<p>三层结构，职责边界很清楚：</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>src/test/java/com/autotest</span></span>
+<span class="line"><span>├── common/ConfigReader         # 配置读取：-D 参数 > config.properties > 代码默认值</span></span>
+<span class="line"><span>├── core/</span></span>
+<span class="line"><span>│   ├── DriverFactory           # 驱动创建 / 销毁、窗口与超时设置</span></span>
+<span class="line"><span>│   ├── BasePage                # 元素查找、显式等待、新窗口切换、计数</span></span>
+<span class="line"><span>│   ├── BaseTest                # @BeforeMethod 建驱动 / @AfterMethod 必关驱动</span></span>
+<span class="line"><span>│   └── AllureListener          # 失败自动截图并附到 Allure 报告</span></span>
+<span class="line"><span>├── pages/</span></span>
+<span class="line"><span>│   ├── BilibiliHomePage        # 首页：打开、搜索、是否加载完成</span></span>
+<span class="line"><span>│   └── BilibiliSearchPage      # 搜索页：Tab 切换、空结果态、用户卡片计数</span></span>
+<span class="line"><span>└── tests/</span></span>
+<span class="line"><span>    ├── HomeTest</span></span>
+<span class="line"><span>    ├── SearchTest</span></span>
+<span class="line"><span>    └── SearchNegativeTest</span></span></code></pre>
+<h3 id="元素查找多定位符兜底">元素查找：多定位符兜底</h3>
+<p><code>BasePage#find(By...)</code> 是整个框架最核心的一段，它同时解决四个问题：</p>
+<ol>
+<li><strong>CSS 优先、XPath 兜底</strong> —— 每次轮询都从第一个定位符重新试，不记住”上次是谁失败的”，
+因为页面是动态的，某个定位符可能这一轮没渲染出来、下一轮就有了；</li>
+<li><strong>过滤不可见元素</strong> —— 遍历结果找第一个 <code>isDisplayed()</code> 的，而不是直接取 <code>get(0)</code>：
+DOM 里可能有隐藏的同名节点（模板、占位），第一个不一定可见；</li>
+<li><strong>单个定位符出错不影响整体</strong> —— 按定位符 catch <code>InvalidSelector / NoSuchElement / StaleElement</code>，
+继续试下一个，这才叫兜底；</li>
+<li><strong>超时信息可读</strong> —— 重写 <code>TimeoutException</code>，把这次依次尝试过的定位符全部打印出来，
+否则 lambda 条件下只会看到一串 lambda 地址，根本不知道是哪个定位符挂了。</li>
+</ol>
+<h3 id="等待策略">等待策略</h3>
+<p>全项目<strong>没有一处固定 sleep</strong>，等待全部是显式条件：</p>
+<ul>
+<li>元素可见 / 可点击 —— <code>visibilityOfElementLocated</code>、<code>elementToBeClickable</code></li>
+<li>URL 变化 —— 用户 Tab 点击后轮询 <code>getCurrentUrl().contains("/upuser")</code></li>
+<li>新窗口出现 —— 搜索会在新窗口打开结果页，先记下句柄集合，再等”多出来的那个句柄”出现</li>
+</ul>
+<p>等待上限由 <code>explicit.timeout=15</code> 秒统一控制，改配置不改代码。</p>
+<h3 id="用例隔离">用例隔离</h3>
+<p><code>BaseTest</code> 用 <code>@BeforeMethod</code> 建驱动、<code>@AfterMethod(alwaysRun = true)</code> 关驱动 ——
+每条用例一个干净浏览器会话，且<strong>失败时也一定会关闭</strong>，避免残留进程拖垮后续用例。</p>
+<h2 id="用例覆盖">用例覆盖</h2>
+<p>当前 3 条核心用例，覆盖「页面能打开 → 核心交互能用 → 异常输入有正确反馈」这条主干：</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>用例</th><th>验证点</th><th>耗时</th></tr></thead><tbody><tr><td><code>homePageShouldLoad</code></td><td>首页「番剧」频道入口可见，且 URL 落在 bilibili.com 域内</td><td>1.34s</td></tr><tr><td><code>searchShouldLoadSearchPage</code></td><td>首页输入关键词回车 → 自动切到搜索结果新窗口 → 结果页 Tab 栏渲染完成</td><td>2.46s</td></tr><tr><td><code>searchShouldShowEmptyStateForUserTab</code></td><td>用乱码关键词搜索 → 切到「用户」Tab → URL 含 <code>/upuser</code>、出现空状态提示、<strong>用户卡片数为 0</strong></td><td>3.37s</td></tr></tbody></table>
+<p>第三条是阴性用例：它验证的不是”能搜到”，而是<strong>搜不到的时候界面给了正确的反馈</strong>。
+阳性用例证明功能可用，阴性用例才证明”没结果”和”坏了”是两件不同的事。</p>
+<h2 id="执行结果">执行结果</h2>
+<p>最近一次全量执行（2026-10-30）：</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="text"><code><span class="line"><span>Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 10.69 s</span></span></code></pre>
+<p>Allure 侧同步产出 3 条 <code>passed</code> 结果，失败截图机制在这个前提下保持待命 ——
+它只有在真的失败时才会留下现场，所以成功跑批时报告里是干净的。</p>
+<h2 id="设计取舍">设计取舍</h2>
+<ul>
+<li><strong>为什么用例范围限定在免登录流程</strong>：B 站登录有风控（滑块 + 设备校验），
+把登录写进用例会让整个套件的稳定性依赖第三方风控策略，
+所以主流程刻意避开登录，换取”任何时候跑都能过”。</li>
+<li><strong>为什么 Allure 停在 2.x</strong>：本机 Allure CLI 是 2.46，Allure 3 换了报告生成架构，
+2.x 的结果目录不能被 3.x 直接渲染 —— 依赖版本要和本机工具链对齐，而不是和官网最新对齐。</li>
+<li><strong>为什么并行度先设为串行</strong>：并行会放大 driver 共享、截图、窗口句柄互相干扰的问题，
+等用例本身稳定后再开并行才有意义。</li>
+</ul>
+<h2 id="项目声明">项目声明</h2>
+<p>本项目为<strong>个人独立项目</strong>：框架设计、编码实现、用例编写与执行验证均由本人独立完成。
+被测站点为公开的 B 站 Web 端，仅用于个人技术练习，不涉及任何非公开接口或数据。</p> <section class="mt-14 border-t border-ink-700 pt-10" id="screenshots"><div class="flex items-baseline justify-between gap-4"><h2 class="text-xl font-bold tracking-tight text-fog-50 md:text-2xl">项目截图</h2><span class="mono text-[11px] text-fog-500">2 张 · 点击放大</span></div><div class="mt-8"><h3 class="mono mb-4 text-xs uppercase tracking-widest text-accent-400">执行结果</h3><div class="space-y-7"><figure class="group"><button type="button" class="block w-full cursor-zoom-in overflow-hidden rounded-xl border border-ink-700 bg-ink-900 p-1 transition-colors hover:border-accent-500/60" data-lightbox="0" aria-label="放大查看：TestNG 执行摘要：3 条用例全部通过，0 失败 0 跳过，总耗时约 10 秒"><img src="/projects/bilibili-testng-summary.png" alt="TestNG 执行摘要：3 条用例全部通过，0 失败 0 跳过，总耗时约 10 秒" loading="lazy" decoding="async" class="w-full rounded-lg"></button><figcaption class="mt-3 flex items-start gap-2 text-[13px] leading-relaxed text-fog-400"><span class="mt-2 size-1 shrink-0 rounded-full bg-accent-500" aria-hidden="true"></span><span>全量执行摘要 —— 3 passed / 0 failed / 0 skipped，逐条用例耗时可见（首页 1.3s、搜索 2.5s、空结果态 3.4s）</span></figcaption></figure><figure class="group"><button type="button" class="block w-full cursor-zoom-in overflow-hidden rounded-xl border border-ink-700 bg-ink-900 p-1 transition-colors hover:border-accent-500/60" data-lightbox="1" aria-label="放大查看：TestNG 报告总览页，显示 3 methods, 3 passed"><img src="/projects/bilibili-testng-report.png" alt="TestNG 报告总览页，显示 3 methods, 3 passed" loading="lazy" decoding="async" class="w-full rounded-lg"></button><figcaption class="mt-3 flex items-start gap-2 text-[13px] leading-relaxed text-fog-400"><span class="mt-2 size-1 shrink-0 rounded-full bg-accent-500" aria-hidden="true"></span><span>TestNG 报告总览：单个 suite、3 个方法全部通过</span></figcaption></figure></div></div><dialog id="lightbox" class="fixed inset-0 m-0 h-screen max-h-none w-screen max-w-none bg-transparent p-0 backdrop:bg-ink-950/92 backdrop:backdrop-blur-sm"><div class="grid h-full place-items-center overflow-auto p-4 md:p-8"><div class="relative w-full max-w-6xl"><button type="button" id="lightbox-close" class="absolute -top-11 right-0 flex items-center gap-1.5 rounded-lg border border-ink-600 bg-ink-850 px-3 py-1.5 text-xs text-fog-200 transition-colors hover:border-accent-500 hover:text-accent-300" aria-label="关闭"><svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+关闭 (Esc)
+</button><img id="lightbox-img" src="" alt="" class="w-full rounded-xl border border-ink-700"><p id="lightbox-caption" class="mt-4 text-center text-sm text-fog-400"></p></div></div></dialog></section><script type="module">const e=document.getElementById("lightbox"),c=document.getElementById("lightbox-img"),i=document.getElementById("lightbox-caption"),r=document.getElementById("lightbox-close");if(e&&c&&i){const l=[];document.querySelectorAll("button[data-lightbox]").forEach(t=>{const o=t.closest("figure"),n=t.querySelector("img");n&&l.push({src:n.getAttribute("src")||"",alt:n.getAttribute("alt")||"",caption:o?.querySelector("figcaption")?.textContent?.trim()||""})});const s=t=>{const o=l[t];o&&(c.src=o.src,c.alt=o.alt,i.textContent=o.caption||"",e.showModal())};document.querySelectorAll("button[data-lightbox]").forEach(t=>{t.addEventListener("click",()=>s(Number(t.dataset.lightbox)))}),r?.addEventListener("click",()=>e.close()),e.addEventListener("click",t=>{t.target===e&&e.close()}),e.addEventListener("close",()=>{c.src="",i.textContent=""})}</script> </article> <aside class="hidden lg:block"> <div class="sticky top-24"> <p class="mono text-[11px] uppercase tracking-widest text-fog-500">本页目录</p> <nav class="mt-3 border-l border-ink-700" aria-label="页内目录"> <ul class="space-y-1.5"> <li> <a href="#项目背景" class="block border-l-2 border-transparent py-0.5 text-[13px] leading-snug text-fog-500 transition-colors hover:border-accent-500 hover:text-accent-300 -ml-px pl-3"> 项目背景 </a> </li><li> <a href="#技术栈" class="block border-l-2 border-transparent py-0.5 text-[13px] leading-snug text-fog-500 transition-colors hover:border-accent-500 hover:text-accent-300 -ml-px pl-3"> 技术栈 </a> </li><li> <a href="#架构设计" class="block border-l-2 border-transparent py-0.5 text-[13px] leading-snug text-fog-500 transition-colors hover:border-accent-500 hover:text-accent-300 -ml-px pl-3"> 架构设计 </a> </li><li> <a href="#元素查找多定位符兜底" class="block border-l-2 border-transparent py-0.5 text-[13px] leading-snug text-fog-500 transition-colors hover:border-accent-500 hover:text-accent-300 -ml-px pl-6 text-xs"> 元素查找：多定位符兜底 </a> </li><li> <a href="#等待策略" class="block border-l-2 border-transparent py-0.5 text-[13px] leading-snug text-fog-500 transition-colors hover:border-accent-500 hover:text-accent-300 -ml-px pl-6 text-xs"> 等待策略 </a> </li><li> <a href="#用例隔离" class="block border-l-2 border-transparent py-0.5 text-[13px] leading-snug text-fog-500 transition-colors hover:border-accent-500 hover:text-accent-300 -ml-px pl-6 text-xs"> 用例隔离 </a> </li><li> <a href="#用例覆盖" class="block border-l-2 border-transparent py-0.5 text-[13px] leading-snug text-fog-500 transition-colors hover:border-accent-500 hover:text-accent-300 -ml-px pl-3"> 用例覆盖 </a> </li><li> <a href="#执行结果" class="block border-l-2 border-transparent py-0.5 text-[13px] leading-snug text-fog-500 transition-colors hover:border-accent-500 hover:text-accent-300 -ml-px pl-3"> 执行结果 </a> </li><li> <a href="#设计取舍" class="block border-l-2 border-transparent py-0.5 text-[13px] leading-snug text-fog-500 transition-colors hover:border-accent-500 hover:text-accent-300 -ml-px pl-3"> 设计取舍 </a> </li><li> <a href="#项目声明" class="block border-l-2 border-transparent py-0.5 text-[13px] leading-snug text-fog-500 transition-colors hover:border-accent-500 hover:text-accent-300 -ml-px pl-3"> 项目声明 </a> </li> <li> <a href="#screenshots" class="-ml-px block border-l-2 border-transparent py-0.5 pl-3 text-[13px] leading-snug text-fog-500 transition-colors hover:border-accent-500 hover:text-accent-300">
+项目截图
+</a> </li> </ul> </nav> <a href="/resume.pdf" download class="btn btn-ghost mt-8 w-full !text-[13px]">
+下载简历 PDF
+</a> </div> </aside> </div> </div>  <section class="border-t border-ink-800 bg-ink-900/40"> <div class="wrap py-12"> <p class="mono text-[11px] uppercase tracking-widest text-fog-500">其他项目</p> <div class="mt-5 grid gap-4 sm:grid-cols-2"> <a href="/projects/xzs-api-test" class="card card-hoverable group block p-5"> <div class="flex items-center justify-between gap-3"> <h3 class="text-sm font-semibold text-fog-50 transition-colors group-hover:text-accent-300"> 学之思管理端 · API（接口）自动化测试 </h3> <span class="mono shrink-0 text-[11px] text-fog-500">2026.07 – 2026.09</span> </div> <p class="mt-2 line-clamp-2 text-xs leading-relaxed text-fog-400"> 独立设计并实现「用例层 – 接口层 – 造数层 – 基础层」四层架构的接口自动化测试框架，覆盖管理端 6 大模块 21 个接口、沉淀 35 条用例，用例通过率与接口覆盖率均达 100%，执行后数据零残留。 </p> </a> </div> </div> </section><script type="module">const o=()=>{const t=window.location.hash;if(!t)return;let e;try{e=document.querySelector(t)}catch{return}if(!e)return;const n=e.closest("details");n&&(n.open=!0,window.requestAnimationFrame(()=>e.scrollIntoView({block:"start"})))};o();window.addEventListener("hashchange",o);</script>  </main> <!--
+  注意：这里刻意【不加】深色底（原来是 bg-ink-900/40）。
+  加了之后联系板块的文字实渲染亮度比其他板块低约 8%
+  （实测文字均值 111.5 vs 其他板块平均 121.6），整块看起来发闷。
+  去掉底色后，3D 星野直接透过来，文字亮度与其他板块一致；
+  实测星野在这个位置的亮度不会干扰阅读，所以不需要那层遮罩。
+  上边框保留，作为板块之间的分隔。
+--><footer id="contact" class="ds-contact relative border-t border-ink-800" data-astro-cid-sz7xmlte> <!-- 底部一层微弱光晕，收尾不显得突兀 --> <div class="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-accent-500/[0.05] to-transparent" aria-hidden="true" data-astro-cid-sz7xmlte></div> <div class="wrap relative py-16" data-astro-cid-sz7xmlte> <div class="grid gap-12 lg:grid-cols-[1.15fr_1fr]" data-astro-cid-sz7xmlte> <!-- 左：主行动号召（放大的欢迎语） --> <div data-astro-cid-sz7xmlte> <p class="eyebrow" data-astro-cid-sz7xmlte>Contact</p> <h2 class="mt-4 text-3xl font-bold leading-tight tracking-tight text-white md:text-4xl" data-astro-cid-sz7xmlte>
+对我的项目有疑问，<br class="hidden sm:block" data-astro-cid-sz7xmlte>
+或者想看看具体代码？
+<span class="mt-2 block text-accent-300" data-astro-cid-sz7xmlte>欢迎直接联系。</span> </h2> <p class="mt-5 max-w-lg text-sm leading-relaxed text-fog-200" data-astro-cid-sz7xmlte>
+接口自动化的分层设计、测试数据怎么做到零残留、缺陷是怎么定位到代码行的 ——
+          这些问题我都很乐意展开聊，也欢迎直接翻我的仓库。
+</p> <!-- 所在地：按要求放在页面最下方区域 --> <div class="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2" data-astro-cid-sz7xmlte> <p class="inline-flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-850 px-3.5 py-2 text-sm text-fog-200" data-astro-cid-sz7xmlte> <svg class="size-4 text-accent-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-astro-cid-sz7xmlte> <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" data-astro-cid-sz7xmlte></path> <circle cx="12" cy="10" r="3" data-astro-cid-sz7xmlte></circle> </svg>
+现居 <span class="font-medium text-fog-50" data-astro-cid-sz7xmlte>深圳南山</span> </p> <p class="inline-flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-850 px-3.5 py-2 text-sm text-fog-200" data-astro-cid-sz7xmlte> <svg class="size-4 text-accent-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-astro-cid-sz7xmlte> <path d="M22 10v6M2 10l10-5 10 5-10 5z" data-astro-cid-sz7xmlte></path> <path d="M6 12v5c3 3 9 3 12 0v-5" data-astro-cid-sz7xmlte></path> </svg> 广州工商学院 <span class="text-fog-400" data-astro-cid-sz7xmlte> 软件工程 · 本科 </span> </p> </div> <div class="mt-7 flex flex-wrap gap-3" data-astro-cid-sz7xmlte> <a href="mailto:2746167445@qq.com" class="btn btn-primary" data-astro-cid-sz7xmlte> <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-astro-cid-sz7xmlte> <rect x="2" y="4" width="20" height="16" rx="2" data-astro-cid-sz7xmlte></rect> <path d="m22 7-10 6L2 7" data-astro-cid-sz7xmlte></path> </svg>
+发邮件给我
+</a> <button type="button" data-resume-preview class="btn btn-ghost" data-astro-cid-sz7xmlte> <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-astro-cid-sz7xmlte> <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" data-astro-cid-sz7xmlte></path> <circle cx="12" cy="12" r="3" data-astro-cid-sz7xmlte></circle> </svg>
+在线预览简历
+</button> <a href="/resume.pdf" download class="btn btn-ghost" data-astro-cid-sz7xmlte> <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-astro-cid-sz7xmlte> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" data-astro-cid-sz7xmlte></path> <polyline points="7 10 12 15 17 10" data-astro-cid-sz7xmlte></polyline> <line x1="12" y1="15" x2="12" y2="3" data-astro-cid-sz7xmlte></line> </svg>
+下载简历 PDF
+</a> </div> </div> <!-- 右：联系方式清单，每项都标注是什么 --> <div class="lg:justify-self-end lg:pt-2" data-astro-cid-sz7xmlte> <p class="mono text-[11px] uppercase tracking-widest text-fog-300" data-astro-cid-sz7xmlte>在哪里找到我</p> <ul class="mt-4 space-y-2.5" data-astro-cid-sz7xmlte> <li data-astro-cid-sz7xmlte> <a href="https://github.com/liu66547" target="_blank" rel="noopener noreferrer" class="card ds-contact-card group flex w-full items-center gap-3 p-3.5 lg:w-72" data-astro-cid-sz7xmlte> <span class="ds-contact-icon grid size-9 shrink-0 place-items-center rounded-lg border border-ink-600 bg-ink-850 transition-colors group-hover:border-accent-500/60 group-hover:text-accent-300" aria-hidden="true" data-astro-cid-sz7xmlte> <svg class="size-4" viewBox="0 0 24 24" fill="currentColor" data-astro-cid-sz7xmlte> <path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 0-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.2.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.1 0 4.7-2.8 5.7-5.5 6 .4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3Z" data-astro-cid-sz7xmlte></path> </svg>   </span> <span class="min-w-0 flex-1" data-astro-cid-sz7xmlte> <span class="block text-[11px] text-fog-300" data-astro-cid-sz7xmlte>GitHub</span> <span class="ds-contact-value mono block truncate text-[13px]" data-astro-cid-sz7xmlte> @liu66547 </span> </span> </a> </li><li data-astro-cid-sz7xmlte> <a href="https://gitee.com/liu66547" target="_blank" rel="noopener noreferrer" class="card ds-contact-card group flex w-full items-center gap-3 p-3.5 lg:w-72" data-astro-cid-sz7xmlte> <span class="ds-contact-icon grid size-9 shrink-0 place-items-center rounded-lg border border-ink-600 bg-ink-850 transition-colors group-hover:border-accent-500/60 group-hover:text-accent-300" aria-hidden="true" data-astro-cid-sz7xmlte>  <span class="font-mono text-[13px] font-bold" data-astro-cid-sz7xmlte>G</span>  </span> <span class="min-w-0 flex-1" data-astro-cid-sz7xmlte> <span class="block text-[11px] text-fog-300" data-astro-cid-sz7xmlte>Gitee</span> <span class="ds-contact-value mono block truncate text-[13px]" data-astro-cid-sz7xmlte> @liu66547 </span> </span> </a> </li><li data-astro-cid-sz7xmlte> <a href="mailto:2746167445@qq.com" class="card ds-contact-card group flex w-full items-center gap-3 p-3.5 lg:w-72" data-astro-cid-sz7xmlte> <span class="ds-contact-icon grid size-9 shrink-0 place-items-center rounded-lg border border-ink-600 bg-ink-850 transition-colors group-hover:border-accent-500/60 group-hover:text-accent-300" aria-hidden="true" data-astro-cid-sz7xmlte>   <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-sz7xmlte> <rect x="2" y="4" width="20" height="16" rx="2" data-astro-cid-sz7xmlte></rect> <path d="m22 7-10 6L2 7" data-astro-cid-sz7xmlte></path> </svg> </span> <span class="min-w-0 flex-1" data-astro-cid-sz7xmlte> <span class="block text-[11px] text-fog-300" data-astro-cid-sz7xmlte>邮箱</span> <span class="ds-contact-value mono block truncate text-[13px]" data-astro-cid-sz7xmlte> 2746167445@qq.com </span> </span> </a> </li> </ul> </div> </div> <div class="mt-14 flex flex-col gap-2 border-t border-ink-800 pt-6 text-xs text-fog-500 sm:flex-row sm:items-center sm:justify-between" data-astro-cid-sz7xmlte> <p data-astro-cid-sz7xmlte>© 2026 刘德啉</p> <p class="mono" data-astro-cid-sz7xmlte> 广州工商学院 · 软件工程 · 本科 · 2023 – 2027 </p> </div> </div> </footer> <!--
+  ══════════════════════════════════════════════════════════════
+  联系板块的文字可读性覆盖
+
+  为什么需要这一块：
+    联系板块的背景是全站唯一"完全透明"的位置 —— 3D 星野与原初深空
+    直接透过来，而且它还落在页面最底部（画面最暗的区域）。
+    实测该板块的文字渲染亮度确实低于其他板块，观感发闷。
+
+  硬性约束（严格遵守）：
+    · 只改文字颜色 / 字重 / 文字投影 / 卡片底色透明度这四个维度
+    · 绝不动布局，绝不动其他板块，绝不提亮 3D 背景
+    · 全部选择器都以 .ds-contact 作用域或专用的 .ds-contact-* 类名开头，
+      不会影响到 Nav、Hero 等其他地方的 .btn / .card
+
+  为什么用 !important：
+    .card 与 .btn-ghost 定义在 global.css，且 .btn-primary 的背景是品牌青
+    （#14b8a6），白色文字在它上面几乎没有对比度，必须把两种按钮分开处理。
+    这里用 !important 保证覆盖顺序不受构建影响，行为可预测。
+-->  <!-- 简历在线预览弹层：全局挂载一次，任何带 data-resume-preview 的按钮都能唤起 --> <dialog id="resume-dialog" class="fixed inset-0 m-0 h-screen max-h-none w-screen max-w-none bg-transparent p-0 backdrop:bg-ink-950/92 backdrop:backdrop-blur-sm" aria-label="简历在线预览"> <div class="flex h-full flex-col p-3 md:p-6"> <!-- 顶部条：标题 + 操作 --> <div class="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3"> <p class="mono text-[11px] uppercase tracking-widest text-fog-500">
+简历预览 · 刘德啉 </p> <div class="flex items-center gap-2"> <a href="/resume.pdf" download class="btn btn-primary !px-3.5 !py-2 !text-[13px]"> <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path> <polyline points="7 10 12 15 17 10"></polyline> <line x1="12" y1="15" x2="12" y2="3"></line> </svg>
+下载 PDF
+</a> <a href="/resume.pdf" target="_blank" rel="noopener noreferrer" class="btn btn-ghost !px-3.5 !py-2 !text-[13px]" title="手机上如果预览显示不了，用这个在新窗口打开"> <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"> <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path> <polyline points="15 3 21 3 21 9"></polyline> <line x1="10" y1="14" x2="21" y2="3"></line> </svg> <span class="hidden sm:inline">新窗口打开</span> <span class="sm:hidden">新窗口</span> </a> <button type="button" data-resume-close class="btn btn-ghost !px-3.5 !py-2 !text-[13px]" aria-label="关闭简历预览"> <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"> <line x1="18" y1="6" x2="6" y2="18"></line> <line x1="6" y1="6" x2="18" y2="18"></line> </svg>
+关闭
+</button> </div> </div> <!-- PDF 容器：延迟加载 src，避免每次进页面都下载 269KB 的 PDF --> <div class="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-ink-700 bg-ink-900"> <iframe id="resume-frame" data-src="/resume.pdf" title="刘德啉 的简历 PDF 预览" class="size-full"></iframe> <!-- 加载提示：iframe 首次渲染 PDF 需要一点时间 --> <div id="resume-hint" class="pointer-events-none absolute inset-0 grid place-items-center bg-ink-900"> <p class="mono text-xs text-fog-500">正在载入简历…</p> </div> </div> <p class="mono mt-2.5 shrink-0 text-center text-[11px] text-fog-500">
+按 Esc 关闭 · 手机上若无法显示，请点「新窗口打开」
+</p> </div> </dialog> <script type="module">const t=document.getElementById("resume-dialog"),r=document.getElementById("resume-frame");if(t&&r){const e=document.getElementById("resume-hint"),o=e?.parentElement??null,c=e?.nextSibling??null,s=()=>{const n=r.dataset.src;!n||r.getAttribute("src")||(e&&o&&!e.isConnected&&o.insertBefore(e,c),r.setAttribute("src",n),r.addEventListener("load",()=>e?.remove(),{once:!0}),window.setTimeout(()=>e?.remove(),3e3))};document.querySelectorAll("[data-resume-preview]").forEach(n=>{n.addEventListener("click",d=>{d.preventDefault(),s(),t.showModal()})}),document.querySelector("[data-resume-close]")?.addEventListener("click",()=>{t.close()}),t.addEventListener("click",n=>{n.target===t&&t.close()}),t.addEventListener("close",()=>{r.removeAttribute("src")})}</script> <script type="module">const o=document.documentElement.classList.contains("snap-enabled"),c=window.matchMedia("(prefers-reduced-motion: no-preference)").matches;if(o&&c){const e=()=>{const i=window.innerHeight*.92;document.querySelectorAll("main > section").forEach(t=>{const s=t.getBoundingClientRect().height<=i;t.classList.toggle("snap-point",s)})};document.readyState==="complete"?e():window.addEventListener("load",e,{once:!0});let n;window.addEventListener("resize",()=>{window.clearTimeout(n),n=window.setTimeout(e,200)})}else o&&document.documentElement.classList.remove("snap-enabled");</script> <script type="module">const i=window.matchMedia("(prefers-reduced-motion: reduce)").matches,r=document.querySelectorAll(".reveal"),o=()=>r.forEach(e=>e.classList.add("is-visible"));if(i||!("IntersectionObserver"in window))o();else{const e=new IntersectionObserver(s=>{s.forEach(t=>{t.isIntersecting&&(t.target.classList.add("is-visible"),e.unobserve(t.target))})},{rootMargin:"0px 0px -8% 0px",threshold:.05});r.forEach(s=>e.observe(s)),window.setTimeout(o,2500)}</script> </body> </html>
